@@ -65,9 +65,14 @@ def _verdicts_to_zones(verdicts: Iterable[Verdict]) -> list[Zone]:
 
     Abbreviation findings keep fractional positions (900.xxx) so the UI
     can group them in their own sub-section after the structural zones.
+
+    Sequential `pin` numbers are assigned to bbox-bound zones (1, 2, 3…)
+    in spine order — these match the overlay rectangles drawn over the
+    PDF page render. Zones without a bbox get `pin: None`.
     """
     sorted_verdicts = sorted(verdicts, key=lambda v: v.doc_pos_hint)
     zones: list[Zone] = []
+    next_pin = 1
     for idx, v in enumerate(sorted_verdicts, start=1):
         # Abbreviation zones use a stable id based on acronym; structural
         # zones use a sequential id.
@@ -78,6 +83,10 @@ def _verdicts_to_zones(verdicts: Iterable[Verdict]) -> list[Zone]:
         else:
             zone_id = f"z{idx}"
             doc_pos = float(idx)
+        pin: int | None = None
+        if v.bbox is not None:
+            pin = next_pin
+            next_pin += 1
         zones.append(
             Zone(
                 id=zone_id,
@@ -97,7 +106,9 @@ def _verdicts_to_zones(verdicts: Iterable[Verdict]) -> list[Zone]:
                 dependencies_triggered=v.dependencies_triggered,
                 annotation_draft=v.annotation_draft,
                 vvpm_anchor=v.vvpm_anchor,
-                pin=None,  # pins assigned by the preview-overlay layer when bbox present
+                pin=pin,
+                bbox=v.bbox,
+                page=v.page,
             )
         )
     return zones

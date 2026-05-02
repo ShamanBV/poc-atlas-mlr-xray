@@ -49,6 +49,8 @@
       annotationDraft: z.annotation_draft,
       vvpmAnchor: z.vvpm_anchor,
       pin: z.pin,
+      bbox: z.bbox,                    // PDF-point coords; overlay layer transforms to px
+      page: z.page,                    // 1-indexed; matches /api/preview/{id}/page/{n}.png
     };
   }
 

@@ -99,12 +99,16 @@ def _block_from_extractor(raw: dict) -> ExtractedBlock:
     # Defensive role downgrade for reference-shaped BODY content (D27).
     if role == "BODY" and _looks_like_reference_entry(text):
         role = "REFERENCE"
+    # The extractor uses 0-indexed page numbers; the precheck schema +
+    # /api/preview/{id}/page/{n}.png route are 1-indexed, so normalise here.
+    raw_page = raw.get("page")
+    page = (raw_page + 1) if isinstance(raw_page, int) else None
     return ExtractedBlock(
         id=raw["id"],
         role=role,
         subtype=raw.get("subtype"),
         text=text,
-        page=raw.get("page"),
+        page=page,
         bbox=_bbox_from_list(raw.get("bbox")),
         font_hierarchy=raw.get("font_hierarchy"),
         links=links,

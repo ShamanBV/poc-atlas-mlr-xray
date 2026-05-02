@@ -86,6 +86,13 @@ class Zone(BaseModel):
     vvpm_anchor: Optional[str] = None
     pin: Optional[int] = None
 
+    # Spatial anchor for the preview overlay. When present, the
+    # frontend renders a hover/click hotspot on the PDF page at this
+    # bbox. Optional because Layer 2 envelope-level findings have no
+    # natural spatial location (the asset is *missing* the content).
+    bbox: Optional[BoundingBox] = None
+    page: Optional[int] = None  # 1-indexed; matches preview/{id}/pages
+
 
 class EmailBlock(BaseModel):
     id: str

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .schema import (
+    BoundingBox,
     DependencyTrigger,
     DiffSegment,
     PatternBase,
@@ -52,6 +53,10 @@ class Verdict:
 
     annotation_draft: Optional[str] = None
     vvpm_anchor: Optional[str] = None
+
+    # Spatial anchor for the preview overlay; threaded into Zone.bbox/page.
+    bbox: Optional[BoundingBox] = None
+    page: Optional[int] = None
 
     # Layer-internal hint for asset_builder positioning. Bigger anchor →
     # later in the spine. Values are arbitrary; the aggregator sorts them

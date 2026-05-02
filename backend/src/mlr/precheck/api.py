@@ -20,7 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from mlr.fixtures import assets as fixture_assets
 from mlr.ingest import library_bootstrap
@@ -28,6 +28,7 @@ from mlr.precheck import abbreviation_check, claim_check, document_check, librar
 from mlr.precheck.asset_builder import build_asset
 from mlr.precheck.dependency_rules import load_default_catalog
 from mlr.precheck.schema import Asset, ErrorBody, ErrorResponse
+from mlr.preview import render as pdf_render
 
 
 app = FastAPI(
@@ -152,16 +153,8 @@ def list_assets() -> list[dict]:
     return out
 
 
-@app.get("/api/preview/{asset_id}.pdf")
-def get_preview_pdf(asset_id: str):
-    """
-    Stream the source PDF for a given asset_id.
-
-    Looks up the fixture's `pdf_path`; returns 404 if either the asset
-    is unknown or no PDF is wired up. The response sets
-    `Content-Disposition: inline` so browsers render the PDF in-place
-    via their built-in viewer (no PDF.js dep needed for the POC).
-    """
+def _resolve_pdf_path(asset_id: str) -> Path:
+    """Common pre-flight for the preview routes — 404s with a structured body."""
     extracted = fixture_assets.get(asset_id)
     if extracted is None:
         raise HTTPException(
@@ -184,6 +177,64 @@ def get_preview_pdf(asset_id: str):
                 }
             },
         )
+    return pdf_path
+
+
+@app.get("/api/preview/{asset_id}/pages")
+def get_preview_pages(asset_id: str, dpi: int = 144) -> dict:
+    """
+    Per-page metadata so the frontend can lay out the preview pane and
+    convert PDF point coords to pixel coords for the bbox overlay.
+    """
+    pdf_path = _resolve_pdf_path(asset_id)
+    metas = pdf_render.page_metadata(pdf_path, dpi=dpi)
+    return {
+        "asset_id": asset_id,
+        "page_count": len(metas),
+        "dpi": dpi,
+        "pages": [
+            {
+                "page": m.page,
+                "width_pt": m.width_pt,
+                "height_pt": m.height_pt,
+                "width_px": m.width_px,
+                "height_px": m.height_px,
+            }
+            for m in metas
+        ],
+    }
+
+
+@app.get("/api/preview/{asset_id}/page/{page_number}.png")
+def get_preview_page_png(asset_id: str, page_number: int, dpi: int = 144):
+    """Render a single PDF page as PNG bytes at the requested DPI."""
+    pdf_path = _resolve_pdf_path(asset_id)
+    try:
+        png = pdf_render.render_page_png(pdf_path, page_number, dpi=dpi)
+    except IndexError as e:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "page_out_of_range", "message": str(e)}},
+        )
+    return Response(
+        content=png,
+        media_type="image/png",
+        # Long-cached by (asset_id, page, dpi) — re-render only when the
+        # underlying PDF changes (which we don't support yet).
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/preview/{asset_id}.pdf")
+def get_preview_pdf(asset_id: str):
+    """
+    Stream the source PDF for a given asset_id (legacy iframe path).
+
+    The newer paged-PNG preview (`/page/{n}.png`) is what the frontend
+    overlay layer renders against. This endpoint stays for raw-PDF
+    download or external embedding.
+    """
+    pdf_path = _resolve_pdf_path(asset_id)
     return FileResponse(
         path=str(pdf_path),
         media_type="application/pdf",

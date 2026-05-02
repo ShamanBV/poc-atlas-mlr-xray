@@ -62,6 +62,7 @@ def _verdict_for_match(
     *,
     clean_min: float,
     drift_min: float,
+    block_lookup: dict | None = None,
 ) -> Verdict:
     """Build a Verdict for a (module, best_canonical, similarity) triple."""
     subtype = (module.subtype or "general").lower()
@@ -120,6 +121,19 @@ def _verdict_for_match(
 
     vvpm_anchor = f"anchor_{module.block_ids[0]}" if module.block_ids else None
 
+    # Spatial anchor: use the first block of the module that has a bbox.
+    # Module text often spans claim + evidence fragments — we point the
+    # overlay at the most prominent block (the first listed).
+    bbox = None
+    page = None
+    if block_lookup and module.block_ids:
+        for bid in module.block_ids:
+            blk = block_lookup.get(bid)
+            if blk is not None and blk.bbox is not None:
+                bbox = blk.bbox
+                page = blk.page
+                break
+
     return Verdict(
         layer="claim",
         sub_layer=sub_layer,
@@ -136,6 +150,8 @@ def _verdict_for_match(
         dependencies_triggered=[],
         annotation_draft=annotation_draft,
         vvpm_anchor=vvpm_anchor,
+        bbox=bbox,
+        page=page,
         doc_pos_hint=_DOC_POS_BASE + pos_idx,
     )
 
@@ -160,6 +176,7 @@ def run(
     learned yet.
     """
     embedder = embedder or default_embedder()
+    block_lookup = {b.id: b for b in asset.blocks}
     verdicts: list[Verdict] = []
     for idx, module in enumerate(asset.modules):
         if not module.claim:
@@ -192,6 +209,7 @@ def run(
                 pos_idx=idx,
                 clean_min=clean_min,
                 drift_min=drift_min,
+                block_lookup=block_lookup,
             )
         )
     return verdicts

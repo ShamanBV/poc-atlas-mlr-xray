@@ -130,6 +130,7 @@ def _verdict_for_undefined_acronym(
     occurrences: int,
     glossary_entry: GlossaryEntry | None,
     block_ids: list[str],
+    block_lookup: dict | None = None,
 ) -> Verdict:
     """One Zone per undefined acronym."""
     if glossary_entry is not None:
@@ -164,6 +165,19 @@ def _verdict_for_undefined_acronym(
     severity = "warn" if glossary_entry is not None else "warn"  # both are warn in v1
     occurrence_label = f"{occurrences}×" if occurrences > 1 else "1×"
 
+    # Spatial anchor — first block in which this acronym appears.
+    # Multi-occurrence acronyms still pin to one bbox for simplicity;
+    # the drawer's evidence_detail names the count.
+    bbox = None
+    page = None
+    if block_lookup and block_ids:
+        for bid in block_ids:
+            blk = block_lookup.get(bid)
+            if blk is not None and blk.bbox is not None:
+                bbox = blk.bbox
+                page = blk.page
+                break
+
     return Verdict(
         layer="abbreviation",
         sub_layer=f"abbreviation:{acronym}",
@@ -180,6 +194,8 @@ def _verdict_for_undefined_acronym(
         dependencies_triggered=[_make_dependency_trigger(acronym, occurrences)],
         annotation_draft=annotation_draft,
         vvpm_anchor=None,
+        bbox=bbox,
+        page=page,
         # Push abbreviation findings to the end of the spine; per the
         # design they live in their own Medical-lane sub-section. Unique
         # fractional offset per acronym so ordering is stable.
@@ -211,6 +227,7 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
 
     used = _collect_used_acronyms(asset.blocks, brand_tokens=tuple(document_brands))
 
+    block_lookup = {b.id: b for b in asset.blocks}
     verdicts: list[Verdict] = []
     for acronym, (occurrences, block_ids) in used.items():
         if acronym in defined:
@@ -222,6 +239,7 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
                 occurrences=occurrences,
                 glossary_entry=glossary_entry,
                 block_ids=block_ids,
+                block_lookup=block_lookup,
             )
         )
     return verdicts

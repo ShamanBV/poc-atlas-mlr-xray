@@ -177,37 +177,143 @@ const fetchPrecheck = (assetId) =>
 const fetchAssetList = () =>
   fetchJson(`${BACKEND}/api/assets`);
 
-// ─── PDF EMAIL PREVIEW ────────────────────────────────────────────────────────
-// Replaces the prototype's brand-specific hardcoded React components
-// (KisqaliEmail / LeqvioEmail / JakaviEmail) with an iframe of the
-// real source PDF served by GET /api/preview/{asset_id}.pdf.
+// ─── PAGED PREVIEW WITH BBOX OVERLAY ──────────────────────────────────────────
+// Renders the source PDF as one PNG per page (via /api/preview/{id}/page/{n}.png)
+// stacked vertically. A transparent overlay layer sits on top with one
+// absolutely-positioned rectangle per bbox-bound zone — clicking the
+// rectangle selects that zone in the X-Ray drawer; hovering it
+// highlights both sides via shared `hoveredZone` / `selectedZone` state.
 //
-// Trade-off: zone hover/click cross-linking with the X-Ray drawer is
-// disabled here — the PDF is opaque to React. Once pipeline_v5 emits
-// bbox-bound zones, layer a transparent overlay div on top of the
-// iframe with one absolute-positioned hotspot per zone.bbox.
-const PdfEmailPreview = ({ asset, pdfUrl, emailRef }) => (
-  <div ref={emailRef} style={{
-    flex:1, background:PALETTE.grey100, overflowY:'auto',
-    display:'flex', flexDirection:'column', alignItems:'center',
-    padding:'20px 20px 8px',
-  }}>
-    <div style={{
-      width:'100%', maxWidth:520, height:'calc(100% - 36px)',
-      background:PALETTE.white, borderRadius:4, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
-      overflow:'hidden', display:'flex', flexDirection:'column',
+// Why PNG + overlay instead of an iframe: we can't position DOM over an
+// iframe (the embedded PDF viewer paints its own canvas, doesn't expose
+// page coords to the host page). Server-rendered PNGs with known DPI
+// give us a deterministic point→pixel transform.
+const PagedPreview = ({ assetId, asset, emailRef, hoveredZone, selectedZone, onHover, onSelect }) => {
+  const [pages, setPages] = React.useState(null);
+  const [pageError, setPageError] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setPages(null);
+    setPageError(null);
+    fetchJson(`${BACKEND}/api/preview/${encodeURIComponent(assetId)}/pages`)
+      .then(p => { if (!cancelled) setPages(p); })
+      .catch(e => { if (!cancelled) setPageError(e); });
+    return () => { cancelled = true; };
+  }, [assetId]);
+
+  // Group bbox-bound zones by page for the overlay layer.
+  const zonesByPage = React.useMemo(() => {
+    const map = new Map();
+    (asset.zones || []).forEach(z => {
+      if (!z.bbox || !z.page) return;
+      if (!map.has(z.page)) map.set(z.page, []);
+      map.get(z.page).push(z);
+    });
+    return map;
+  }, [asset.zones]);
+
+  if (pageError) {
+    return (
+      <div style={{ flex:1, background:PALETTE.grey100, padding:40, color:PALETTE.critical600 }}>
+        Preview unavailable: {pageError.message}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={emailRef} style={{
+      flex:1, background:PALETTE.grey100, overflowY:'auto',
+      display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 20px 8px',
     }}>
-      <iframe
-        src={pdfUrl + '#view=FitH&toolbar=0'}
-        style={{ flex:1, width:'100%', border:'none', background:PALETTE.white }}
-        title={`${asset.meta.brand} ${asset.meta.market} preview`}
+      {!pages && (
+        <div style={{ color:PALETTE.grey500, fontSize:13, padding:40 }}>Loading preview…</div>
+      )}
+      {pages && pages.pages.map(p => (
+        <PreviewPage
+          key={p.page}
+          page={p}
+          assetId={assetId}
+          dpi={pages.dpi}
+          zones={zonesByPage.get(p.page) || []}
+          hoveredZone={hoveredZone}
+          selectedZone={selectedZone}
+          onHover={onHover}
+          onSelect={onSelect}
+        />
+      ))}
+      <div style={{ marginTop:10, fontSize:11, color:PALETTE.grey400, textAlign:'center', lineHeight:1.6 }}>
+        Page render at {pages?.dpi || '—'} DPI · click a zone to cross-link with the X-Ray
+      </div>
+    </div>
+  );
+};
+
+const PreviewPage = ({ page, assetId, dpi, zones, hoveredZone, selectedZone, onHover, onSelect }) => {
+  // Constrain the rendered page to a max display width while preserving aspect ratio.
+  // Overlay rectangles scale via the same width-based factor.
+  const MAX_DISPLAY_WIDTH = 600;
+  const scale = Math.min(1, MAX_DISPLAY_WIDTH / page.width_pt);
+  const displayWidth  = page.width_pt  * scale;
+  const displayHeight = page.height_pt * scale;
+  const pngUrl = `${BACKEND}/api/preview/${encodeURIComponent(assetId)}/page/${page.page}.png?dpi=${dpi}`;
+
+  return (
+    <div style={{
+      position:'relative', width:displayWidth, height:displayHeight,
+      background:PALETTE.white, marginBottom:16, borderRadius:4,
+      boxShadow:'0 4px 16px rgba(0,0,0,0.12)', overflow:'hidden',
+    }}>
+      <img
+        src={pngUrl}
+        alt={`${assetId} page ${page.page}`}
+        style={{ display:'block', width:'100%', height:'100%' }}
+        draggable={false}
       />
+      {zones.map(z => {
+        const isHover = hoveredZone === z.id;
+        const isSelected = selectedZone === z.id;
+        const col = z.status === 'clean' ? PALETTE.primary600
+                  : z.status === 'attn'  ? PALETTE.warning600
+                                          : PALETTE.critical600;
+        const bg  = z.status === 'clean' ? PALETTE.primary100
+                  : z.status === 'attn'  ? PALETTE.warning100
+                                          : PALETTE.critical100;
+        const left   = z.bbox.x0 * scale;
+        const top    = z.bbox.y0 * scale;
+        const width  = (z.bbox.x1 - z.bbox.x0) * scale;
+        const height = (z.bbox.y1 - z.bbox.y0) * scale;
+        return (
+          <div
+            key={z.id}
+            onMouseEnter={() => onHover(z.id)}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => onSelect(z.id)}
+            style={{
+              position:'absolute', left, top, width, height,
+              border:`${isSelected ? 2 : 1}px solid ${col}`,
+              background: isHover || isSelected ? `${bg}80` : 'transparent',
+              cursor:'pointer', borderRadius:2,
+              transition:'background 0.12s, border-width 0.12s',
+            }}
+            title={z.label}
+          >
+            {z.pin != null && (
+              <div style={{
+                position:'absolute', top:-9, left:-9,
+                width:18, height:18, borderRadius:'50%',
+                background:col, color:PALETTE.white,
+                fontSize:10, fontWeight:700, display:'flex',
+                alignItems:'center', justifyContent:'center',
+                fontFamily:"'JetBrains Mono', monospace",
+              }}>{z.pin}</div>
+            )}
+          </div>
+        );
+      })}
     </div>
-    <div style={{ marginTop:10, fontSize:11, color:PALETTE.grey400, textAlign:'center', lineHeight:1.6 }}>
-      Source PDF · zone overlay arrives with pipeline_v5 bboxes
-    </div>
-  </div>
-);
+  );
+};
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const App = () => {
@@ -351,8 +457,15 @@ const App = () => {
 
       {/* Body */}
       <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
-        <PdfEmailPreview asset={asset} pdfUrl={`${BACKEND}${asset.preview?.pdf_url || ''}`}
-          emailRef={emailRef}/>
+        <PagedPreview
+          assetId={assetId}
+          asset={asset}
+          emailRef={emailRef}
+          hoveredZone={hoveredZone}
+          selectedZone={selectedZone}
+          onHover={setHoveredZone}
+          onSelect={setSelectedZone}
+        />
 
         {drawerOpen && (
           <Drawer asset={asset} role="reviewer" onClose={()=>setDrawerOpen(false)}
