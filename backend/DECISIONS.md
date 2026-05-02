@@ -393,6 +393,28 @@ that reads the curated store. The `library.set_library` API stays
 the same.
 **Status:** `pinned` (intentional temporary state).
 
+### D27 — Adapter downgrades reference-shaped BODY blocks to REFERENCE
+
+**Current value:** when the upstream extractor labels a citation
+("12. Author et al. Journal. 2024;...") as `BODY`, the adapter detects
+the citation pattern via regex and stamps `role=REFERENCE`. This
+prevents Layer 3 (which excludes REFERENCE / FOOTNOTE roles from
+acronym scanning) from scraping author initials and journal codes
+(`LC`, `RMD`, `SVJS`, …) as undefined acronyms.
+**Where:** `src/mlr/ingest/extractor_adapter.py` →
+`_REFERENCE_LIKE_RE`, `_looks_like_reference_entry`,
+`_block_from_extractor`.
+**Why this value:** observed on the Cosentyx UK fixture — 3 false-
+positive abbreviation findings collapsed to 0 after this fix.
+Defending in the adapter (rather than in `abbreviation_check`) keeps
+the Layer 3 logic clean and means anything else downstream that cares
+about role gets the corrected classification too.
+**How to revise:** when the upstream extractor classifies references
+correctly (the role is provided by `pipeline_email_v3`'s classifier
+already, so this is a band-aid), the adapter check becomes a no-op.
+Drop it once misclassification rate is verified to be near-zero.
+**Status:** `pinned` (band-aid for upstream noise).
+
 ### D26 — Real-data fixtures loaded via adapter at app boot
 
 **Current value:** `mlr.fixtures.assets._load_real_assets` lazily loads

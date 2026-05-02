@@ -65,6 +65,27 @@ def _bbox_from_list(raw: Any) -> Optional[BoundingBox]:
     return BoundingBox(x0=float(raw[0]), y0=float(raw[1]), x1=float(raw[2]), y1=float(raw[3]))
 
 
+# Citations look like "12. Author Initials, Author Initials. Journal Name.
+# 2024;9(2):e002706." or "5. Coates LC et al. Lancet. 2024;...". The
+# upstream extractor sometimes misclassifies them as BODY; we downgrade
+# to REFERENCE so abbreviation_check (which excludes REFERENCE roles)
+# stops scraping author initials and journal codes as acronyms.
+_REFERENCE_LIKE_RE = re.compile(
+    r"^\s*\d{1,2}\.\s+"           # leading "N. "
+    r"[A-Z][A-Za-z'\-]*"           # first author surname
+    r"(\s+[A-Z]{1,4})?"            # optional initials cluster (e.g. "Coates LC")
+    r".{0,120}?"                   # author list / journal name
+    r"\b(et al\.?|[A-Z][A-Za-z\s]+\.\s+\d{4};|\d{4};\d+(\([^)]*\))?:)"
+)
+
+
+def _looks_like_reference_entry(text: str) -> bool:
+    """Heuristic — does this BODY text look like a citation? See _REFERENCE_LIKE_RE."""
+    if not text:
+        return False
+    return bool(_REFERENCE_LIKE_RE.match(text.strip()))
+
+
 def _block_from_extractor(raw: dict) -> ExtractedBlock:
     """One extractor block → one ExtractedBlock."""
     links = []
@@ -73,11 +94,16 @@ def _block_from_extractor(raw: dict) -> ExtractedBlock:
             links.append(ln["uri"])
         elif isinstance(ln, str):
             links.append(ln)
+    role = raw.get("role") or "BODY"
+    text = raw.get("text", "")
+    # Defensive role downgrade for reference-shaped BODY content (D27).
+    if role == "BODY" and _looks_like_reference_entry(text):
+        role = "REFERENCE"
     return ExtractedBlock(
         id=raw["id"],
-        role=raw.get("role") or "BODY",
+        role=role,
         subtype=raw.get("subtype"),
-        text=raw.get("text", ""),
+        text=text,
         page=raw.get("page"),
         bbox=_bbox_from_list(raw.get("bbox")),
         font_hierarchy=raw.get("font_hierarchy"),
