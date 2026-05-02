@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MLR X-Ray — Shaman</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; overflow: hidden; }
+    body { font-family: 'Noto Sans', sans-serif; background: #FBFBFB; color: #323232; font-size: 14px; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D7D7D7; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9FA3A4; }
+    textarea:focus { border-color: #00A66F !important; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* Tweaks panel */
+    #tweaks-panel {
+      position: fixed; bottom: 16px; right: 16px; width: 220px;
+      background: #fff; border: 1px solid #EFEFEF; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 14px; z-index: 9999;
+      display: none; font-size: 13px;
+    }
+    #tweaks-panel.visible { display: block; }
+    #tweaks-panel h4 { font-size: 11px; font-weight: 700; color: #9FA3A4; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .tr { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+    .tr label { font-size: 11px; font-weight: 500; color: #6F7E7F; }
+    .tr select { font-family: 'Noto Sans', sans-serif; font-size: 12px; border: 1px solid #D7D7D7; border-radius: 4px; padding: 4px 8px; color: #323232; background: #fff; outline: none; cursor: pointer; }
+    .tc { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .tc input[type=checkbox] { width: 14px; height: 14px; accent-color: #00A66F; cursor: pointer; }
+    .tc label { font-size: 11px; color: #6F7E7F; cursor: pointer; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<div id="tweaks-panel">
+  <h4>Tweaks</h4>
+  <div class="tr">
+    <label>Asset</label>
+    <select id="tw-asset">
+      <option value="kisqali">KISQALI UK — Warn · 2 attention, 1 missing</option>
+      <option value="leqvio">LEQVIO IE — Pass · all clean</option>
+      <option value="jakavi">JAKAVI UK — Fail · 2 missing</option>
+    </select>
+  </div>
+  <div class="tr">
+    <label>Viewing as</label>
+    <select id="tw-role">
+      <option value="reviewer">MLR reviewer</option>
+      <option value="author">Content author</option>
+    </select>
+  </div>
+
+</div>
+
+<script type="text/babel" src="XRayData.jsx"></script>
+<script type="text/babel" src="XRayEmail.jsx"></script>
+<script type="text/babel" src="XRayDrawer.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{"asset":"kisqali","role":"reviewer","nosidebar":true}/*EDITMODE-END*/;
+
+// ─── SIDEBAR ASSET CARD ───────────────────────────────────────────────────────
+const AssetCard = ({ assetKey, asset, active, onClick }) => {
+  const s = asset.scores.overall;
+  const col = scoreColor(s);
+  const bg  = s>=90?C.cleanBg:s>=75?C.attnBg:C.missBg;
+  const missing = asset.zones.filter(z=>z.status==='miss').length;
+  const attn    = asset.zones.filter(z=>z.status==='attn').length;
+
+  const tag = missing > 0 ? `${missing} missing`
+    : attn > 0 ? `${attn} attention`
+    : 'All clean';
+  const tagColor = missing>0?C.miss:attn>0?C.attn:C.clean;
+
+  return (
+    <div onClick={()=>onClick(assetKey)} style={{
+      display:'flex',alignItems:'center',gap:8,padding:'7px 9px',
+      cursor:'pointer',borderRadius:5,marginBottom:2,
+      background:active?C.green50:'transparent',
+      border:active?`1px solid ${C.green100}`:'1px solid transparent',
+      transition:'all 0.12s',
+    }}>
+      <span style={{ fontSize:18,fontWeight:700,color:col,
+        fontVariantNumeric:'tabular-nums',flexShrink:0,width:28,textAlign:'right' }}>{s}</span>
+      <div style={{ flex:1,minWidth:0 }}>
+        <div style={{ fontSize:12,fontWeight:600,color:'#323232',
+          whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>
+          {asset.meta.brand}® · {asset.meta.market}
+        </div>
+        <div style={{ fontSize:10,color:'#9FA3A4' }}>{asset.meta.channel}</div>
+      </div>
+      <span style={{ fontSize:10,fontWeight:600,color:tagColor,
+        background:`${tagColor}18`,border:`1px solid ${tagColor}33`,
+        borderRadius:3,padding:'1px 5px',flexShrink:0,whiteSpace:'nowrap' }}>{tag}</span>
+    </div>
+  );
+};
+
+const Sidebar = ({ activeKey, onSelect, role, onRoleChange }) => (
+  <div style={{ width:210,background:'#fff',borderRight:'1px solid #EFEFEF',
+    display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto' }}>
+    <div style={{ padding:'10px 10px 6px',borderBottom:'1px solid #EFEFEF' }}>
+      <div style={{ fontSize:9,fontWeight:700,color:'#9FA3A4',
+        textTransform:'uppercase',letterSpacing:0.8,marginBottom:6 }}>Assets</div>
+      {Object.entries(ASSETS).map(([k,a])=>(
+        <AssetCard key={k} assetKey={k} asset={a} active={k===activeKey} onClick={onSelect}/>
+      ))}
+    </div>
+    <div style={{ padding:'10px 10px' }}>
+      <div style={{ fontSize:9,fontWeight:700,color:'#9FA3A4',
+        textTransform:'uppercase',letterSpacing:0.8,marginBottom:8 }}>Viewing as</div>
+      <div style={{ display:'flex',background:'#1A1A2E',borderRadius:5,padding:2,gap:2 }}>
+        {['reviewer','author'].map(r=>(
+          <button key={r} onClick={()=>onRoleChange(r)} style={{
+            flex:1,padding:'5px 0',borderRadius:3,border:'none',cursor:'pointer',
+            fontFamily:'inherit',fontSize:12,fontWeight:500,transition:'all 0.15s',
+            background:role===r?'#fff':'transparent',
+            color:role===r?'#323232':'rgba(255,255,255,0.45)',
+          }}>{r.charAt(0).toUpperCase()+r.slice(1)}</button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+const App = () => {
+  const [assetKey,  setAssetKey]  = useState(TWEAK_DEFAULTS.asset || 'kisqali');
+  const [role,      setRole]      = useState(TWEAK_DEFAULTS.role  || 'reviewer');
+  const [nosidebar, setNosidebar] = useState(TWEAK_DEFAULTS.nosidebar || false);
+  const [drawerOpen,setDrawerOpen]= useState(true);
+  const [hoveredZone, setHoveredZone] = useState(null);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const emailRef = useRef(null);
+
+  const asset = ASSETS[assetKey];
+
+  // Tweaks panel wiring
+  useEffect(()=>{
+    const handler = e => {
+      if (e.data?.type==='__activate_edit_mode')   document.getElementById('tweaks-panel')?.classList.add('visible');
+      if (e.data?.type==='__deactivate_edit_mode') document.getElementById('tweaks-panel')?.classList.remove('visible');
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type:'__edit_mode_available' }, '*');
+
+    const els = {
+      asset:     document.getElementById('tw-asset'),
+      role:      document.getElementById('tw-role'),
+      nosidebar: document.getElementById('tw-nosidebar'),
+    };
+    if (els.asset)     els.asset.value           = TWEAK_DEFAULTS.asset     || 'kisqali';
+    if (els.role)      els.role.value            = TWEAK_DEFAULTS.role      || 'reviewer';
+    if (els.nosidebar) els.nosidebar.checked     = TWEAK_DEFAULTS.nosidebar || false;
+
+    const onChange = () => {
+      const v = {
+        asset:     els.asset?.value            || 'kisqali',
+        role:      els.role?.value             || 'reviewer',
+        nosidebar: els.nosidebar?.checked      || false,
+      };
+      setAssetKey(v.asset); setRole(v.role); setNosidebar(v.nosidebar);
+      setDrawerOpen(true);
+      window.parent.postMessage({ type:'__edit_mode_set_keys', edits:v }, '*');
+    };
+    Object.values(els).forEach(el => el?.addEventListener('change', onChange));
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const handleSelectAsset = useCallback(key => {
+    setAssetKey(key); setDrawerOpen(true); setHoveredZone(null); setSelectedZone(null);
+  }, []);
+
+  const missing = asset.zones.filter(z=>z.status==='miss').length;
+  const attn    = asset.zones.filter(z=>z.status==='attn').length;
+  const statusLabel = missing>0?`Fail · ${missing} missing`:attn>0?`Warn · ${attn} attention`:'Pass';
+  const statusCol   = missing>0?C.miss:attn>0?C.attn:C.clean;
+  const statusBgCol = missing>0?C.missBg:attn>0?C.attnBg:C.cleanBg;
+
+  return (
+    <div style={{ height:'100vh',display:'flex',flexDirection:'column',overflow:'hidden' }}>
+
+      {/* Top header */}
+      <div style={{ height:56,background:'#C1E8D6',display:'flex',alignItems:'center',
+        flexShrink:0,zIndex:10 }}>
+        <div style={{ width:56,height:56,background:'#00A66F',display:'flex',
+          alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+          <img src="assets/shaman-icon.svg" alt="Shaman" style={{ width:32,height:32,filter:'brightness(0) invert(1)' }}/>
+        </div>
+        <span style={{ fontSize:18,fontWeight:500,color:'#00A66F',padding:'0 16px' }}>Shaman Atlas MLR X-Ray</span>
+        <div style={{ flex:1 }}/>
+        {/* MLR status pill */}
+        <div style={{ display:'flex',alignItems:'center',gap:8,padding:'0 16px' }}>
+          <div onClick={()=>setDrawerOpen(true)} style={{
+            display:'flex',alignItems:'center',gap:7,
+            background:statusBgCol,border:`1px solid ${statusCol}33`,
+            borderRadius:6,padding:'4px 12px',cursor:'pointer',
+          }}>
+            <span style={{ fontSize:11,color:'#6F7E7F' }}>Precheck</span>
+            <span style={{ fontSize:16,fontWeight:700,color:statusCol,
+              fontVariantNumeric:'tabular-nums' }}>{asset.scores.overall}</span>
+            <span style={{ fontSize:11,fontWeight:600,color:statusCol }}>{statusLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ flex:1,display:'flex',overflow:'hidden',position:'relative' }}>
+
+        {/* Sidebar */}
+        {!nosidebar && (
+          <Sidebar activeKey={assetKey} onSelect={handleSelectAsset}
+            role={role} onRoleChange={setRole}/>
+        )}
+
+        {/* Email preview */}
+        <EmailPreview asset={asset} hoveredZone={hoveredZone} selectedZone={selectedZone}
+          onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+
+        {/* X-Ray drawer */}
+        {drawerOpen && (
+          <Drawer asset={asset} role={role} onClose={()=>setDrawerOpen(false)}
+            hoveredZone={hoveredZone} selectedZone={selectedZone}
+            onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+        )}
+
+        {/* Re-open tab */}
+        {!drawerOpen && (
+          <div onClick={()=>setDrawerOpen(true)} style={{
+            position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',
+            background:'#00A66F',color:'#fff',borderRadius:'6px 0 0 6px',
+            padding:'12px 5px',cursor:'pointer',writingMode:'vertical-rl',
+            fontSize:10,fontWeight:700,letterSpacing:0.8,textTransform:'uppercase',
+            display:'flex',alignItems:'center',gap:5,
+          }}>
+            <span className="material-icons" style={{ fontSize:13,
+              transform:'rotate(90deg)',writingMode:'horizontal-tb' }}>science</span>
+            X-Ray
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+# Event-Promotional — UK event invitations
+#
+# UK HCP-targeted event invitations (symposia, congress sessions,
+# webinars). Same audience as UK-Branded-Promotional but the asset
+# shape is event-specific: hero with date+venue, agenda, named KOL
+# speakers, ToV disclosure, registration CTA. Distinct from a regular
+# branded email because:
+#   - Speakers usually trigger r_kol_conflict_disclosure +
+#     r_kol_permission_validity (both critical here, optional elsewhere)
+#   - ABPI Code 28 "Transfer of Value" disclosure is mandatory
+#   - Indication block is OPTIONAL on event invites that don't carry a
+#     branded promotional claim (e.g. educational invitations)
+
+schema_version: "1.0"
+id: Event-Promotional
+market: UK
+languages: [en]
+doc_types: [email]
+description: |
+  UK HCP event invitation email. Audience: registered UK HCPs invited
+  to a symposium, congress session, webinar, or sponsored meeting.
+  Branded if the invitation names a sponsor product; non-branded if it
+  promotes a disease-area meeting only. ToV disclosure mandatory.
+
+# ─── Detection ─────────────────────────────────────────────────────
+detection:
+  required_metadata:
+    market: UK
+    audience: HCP
+    doc_type: email
+    use_case: event_invitation
+  fallback_signals:
+    filename_patterns:
+      - "*event*"
+      - "*invite*"
+      - "*invitation*"
+      - "*symposium*"
+      - "*congress*"
+      - "*webinar*"
+    extracted_text_signals:
+      - "Register"
+      - "Symposium"
+      - "Webinar"
+      - "Agenda"
+      - "Join us"
+      - "RSVP"
+    extracted_block_signals:
+      block_type_present: ["agenda"]
+      role_present: ["CTA"]
+
+# ─── Cascade rules ─────────────────────────────────────────────────
+cascade_rules:
+  medical:
+    # Event invites carrying claims still need safety + ref balance.
+    # When the invite is non-branded (no claim), these rules' triggers
+    # don't fire — the cascade engine handles that.
+    - r_safety_reminder
+    - r_reference_list
+    - r_abbreviations_defined
+  legal:
+    - r_audience_restriction_bar
+    - r_mah_legal_entity
+    - r_unsubscribe_privacy
+    - r_confidentiality_notice
+    - r_tov_disclosure              # ★ event-specific
+    - r_kol_conflict_disclosure     # ★ event-specific (mandatory here)
+    # Pending v1.5 once registry is wired:
+    # - r_kol_permission_validity
+  regulatory:
+    # Indication block only required when the invite names a brand —
+    # the cascade rule r_indication_block has its own trigger that
+    # gates on claim presence. Listed here so the rule is in scope; it
+    # silently no-ops on non-branded invites.
+    - r_indication_block
+    - r_ae_reporting_box
+    - r_approval_code_format
+    - r_date_of_preparation
+    - r_brand_mark_registered
+
+# ─── Precheck dependency rules ─────────────────────────────────────
+precheck_dependency_rules:
+  medical:
+    - r_safety_reminder_after_efficacy_claim
+    - r_abbreviations_defined
+    - r_reference_list_complete
+  legal:
+    - r_third_party_disclaimer_when_external_link
+    - r_kol_conflict_disclosure
+    - r_tov_disclosure_for_event       # ★ event-specific
+    - r_mah_legal_entity_in_footer
+    - r_unsubscribe_privacy_links
+  regulatory:
+    - r_indication_when_drug_named
+    - r_ae_reporting_when_promotional
+    - r_audience_bar_when_hcp_only_profile
+    - r_approval_code_format
+    - r_date_of_preparation_present_and_fresh
+    - r_prescribing_info_link
+    - r_brand_mark_registered
+
+# ─── Auto-insert allowed ───────────────────────────────────────────
+# Event invites generally have less variation than full claim emails,
+# so more rules are auto-insertable. KOL conflict is auto-insertable
+# *only* if the underlying KOL declaration is on file (registry check).
+auto_insert_allowed:
+  - r_audience_restriction_bar
+  - r_mah_legal_entity
+  - r_unsubscribe_privacy
+  - r_confidentiality_notice
+  - r_tov_disclosure
+  - r_kol_conflict_disclosure
+  - r_indication_block
+  - r_ae_reporting_box
+  - r_brand_mark_registered
+
+# ─── Rule overrides ────────────────────────────────────────────────
+rule_overrides:
+  r_approval_code_format:
+    code_regex: "(FA-\\d{8}|MAT-UK-\\d{6})"
+    # Event invites in pilot batch use FA-* draft codes pending approval —
+    # lower threshold for "missing" since some events ship with `[draft]`.
+    accept_draft_code: true
+
+  r_ae_reporting_box:
+    expected_authority: "MHRA Yellow Card Scheme"
+    expected_url_substring: "yellowcard"
+
+  r_tov_disclosure:
+    accepted_text_variants:
+      - "Novartis is providing hospitality at this meeting in line with the ABPI Code of Practice"
+      - "This meeting is being organised in compliance with ABPI Clause 28"
+      - "All hospitality is provided in accordance with the ABPI Code"
+      - "Transfer of Value declared per ABPI Code"
+
+  r_kol_conflict_disclosure:
+    accepted_text_variants:
+      - "Speaker fees and expenses will be covered by Novartis in line with fair market value"
+      - "Speakers receive an honorarium in line with fair market value"
+      - "All speakers are paid an honorarium in line with FMV"
+
+  r_date_of_preparation:
+    freshness_days_warn: 60      # tighter window — events are time-bound
+    freshness_days_block: 180
+
+  r_audience_restriction_bar:
+    accepted_text_variants:
+      - "FOR UK HEALTHCARE PROFESSIONALS ONLY"
+      - "For UK Healthcare Professionals only"
+
+# ─── Profile-level metadata ────────────────────────────────────────
+authority: "ABPI Code of Practice 2024"
+authority_clauses_referenced:
+  audience_restriction: "26.1"
+  tov_disclosure:       "28"
+  kol_disclosure:       "24"
+  date_of_preparation:  "4.10"
+  mah_legal_entity:     "4.1"
+
+# ─── Status ────────────────────────────────────────────────────────
+status:
+  v1_active: true
+  rationale: "Activated with the Jakavi event-invite case (`jakavi_uk_..._Event-Promotional`). Corpus needs ≥10 approved event invitations before pattern banks for ToV / FMV variants are reliable."
+  earliest_corpus_threshold: 10
+  expected_full_coverage_threshold: 25

@@ -1,0 +1,7 @@
+.DS_Store
+**/.DS_Store
+
+# The design handoff folder ships as authoritative source. The zip in
+# `design brief/MLR X-Ray.zip` is a redundant snapshot of the same
+# content — dropped from the repo to keep diffs meaningful.
+design brief/MLR X-Ray.zip

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MLR Precheck — Wireframe 1: Preview + X-ray</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #FAFAF7; padding: 32px; max-width: 1200px; margin: 0 auto; color: #111; }
+  h1 { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+  .caption { font-size: 13px; color: #666; margin-bottom: 24px; }
+  .pin { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: 500; color: white; vertical-align: middle; margin: 0 2px; }
+  .pin-blocker { background: #A32D2D; }
+  .pin-warn { background: #BA7517; }
+  .ghost { border: 1px dashed #F09595; border-radius: 4px; padding: 6px 8px; font-size: 11px; color: #791F1F; font-style: italic; margin: 6px 0; background: #FCEBEB; }
+  .xray-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 0.5px solid rgba(0,0,0,0.15); font-size: 12px; cursor: pointer; }
+  .xray-row.active { background: rgba(0,0,0,0.04); }
+  .xray-row:last-child { border-bottom: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-ok { background: #639922; }
+  .dot-warn { background: #BA7517; }
+  .dot-blocker { background: #A32D2D; }
+  .lane-pill { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500; flex-shrink: 0; }
+  .lane-medical { background: #EEEDFE; color: #3C3489; }
+  .lane-legal { background: #FAECE7; color: #712B13; }
+  .lane-regulatory { background: #E1F5EE; color: #085041; }
+  .panel { background: white; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 12px; }
+  button { font-family: inherit; background: white; border: 0.5px solid rgba(0,0,0,0.3); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
+  button:hover { background: rgba(0,0,0,0.04); }
+</style>
+</head>
+<body>
+
+<h1>Wireframe 1 — Preview + X-ray with pin cross-linking</h1>
+<p class="caption">Two-pane layout. Preview left with numbered pins and ghost placeholders. X-ray right with selected zone expanded inline.</p>
+
+<div class="panel" style="padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px;">
+  <div style="font-size: 13px; font-weight: 500;">Velorex Q2 follow-up <span style="color: #999; font-weight: 400;">· DE · HCP</span></div>
+  <div style="display: flex; gap: 4px;">
+    <span class="lane-pill lane-medical">Med 2</span>
+    <span class="lane-pill lane-legal">Leg 1</span>
+    <span class="lane-pill lane-regulatory">Reg 2</span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px;">
+
+  <div class="panel" style="padding: 12px 14px; font-size: 12px; line-height: 1.55;">
+    <div style="border-bottom: 0.5px solid rgba(0,0,0,0.15); padding-bottom: 8px; margin-bottom: 10px;">
+      <div style="color: #999; font-size: 11px;">From: Medical Affairs &lt;medaffairs@velorex.de&gt;</div>
+      <div style="font-weight: 500; margin-top: 2px;">New 24-week Velorex efficacy data</div>
+      <div style="color: #999; font-size: 11px; margin-top: 1px;">Latest glycemic control results from VEL-2A</div>
+    </div>
+
+    <div style="margin-bottom: 8px;">Dear Dr. {{lastName}},</div>
+
+    <div style="margin-bottom: 8px;">Velorex demonstrated significant glycemic control vs. comparator at 24 weeks in the VEL-2A trial.<sup style="color: #185FA5;">1</sup></div>
+
+    <div style="margin-bottom: 8px;">Velorex was <span style="background: #FAEEDA; padding: 0 2px; border-radius: 2px;">generally well tolerated</span><span class="pin pin-warn">2</span> across the study population.<sup style="color: #185FA5;">1</sup></div>
+
+    <div style="margin-bottom: 8px;"><span style="background: #FCEBEB; padding: 0 2px; border-radius: 2px;">In the same trial, Velorex reduced HbA1c by 1.4% at 24 weeks vs. comparator.</span><span class="pin pin-blocker">3</span></div>
+
+    <div class="ghost">⚠ AE reporting (BfArM) expected here</div>
+
+    <div style="margin-bottom: 8px; font-size: 11px;">Prescribing Information: <a href="#" style="color: #185FA5;">velorex-pi.pdf</a><span class="pin pin-warn">5</span></div>
+
+    <div style="font-size: 11px; color: #999; margin-bottom: 8px;">For healthcare professionals only.</div>
+
+    <div style="font-size: 11px; margin-bottom: 8px;">Best regards,<br>Sara Müller, MSL</div>
+
+    <div class="ghost">⚠ Footer / unsubscribe expected here</div>
+  </div>
+
+  <div>
+    <div class="panel" style="overflow: hidden;">
+      <div style="font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px 4px;">X-ray</div>
+      <div class="xray-row"><div class="dot dot-ok"></div><div style="flex: 1;">Header</div></div>
+      <div class="xray-row"><div class="dot dot-ok"></div><div style="flex: 1;">Hero claim</div></div>
+      <div class="xray-row"><div class="dot dot-warn"></div><div style="flex: 1;">Supporting claim</div><span class="pin pin-warn" style="width:14px;height:14px;font-size:9px;">2</span><span class="lane-pill lane-medical">Med</span></div>
+      <div class="xray-row active"><div class="dot dot-blocker"></div><div style="flex: 1; font-weight: 500;">Secondary claim</div><span class="pin pin-blocker" style="width:14px;height:14px;font-size:9px;">3</span><span class="lane-pill lane-medical">Med</span></div>
+      <div class="xray-row"><div class="dot dot-blocker"></div><div style="flex: 1;">AE reporting</div><span style="font-size: 10px; color: #999;">missing</span><span class="lane-pill lane-regulatory">Reg</span></div>
+      <div class="xray-row"><div class="dot dot-warn"></div><div style="flex: 1;">PI link</div><span class="pin pin-warn" style="width:14px;height:14px;font-size:9px;">5</span><span class="lane-pill lane-regulatory">Reg</span></div>
+      <div class="xray-row"><div class="dot dot-ok"></div><div style="flex: 1;">Audience restriction</div></div>
+      <div class="xray-row"><div class="dot dot-blocker"></div><div style="flex: 1;">Footer</div><span style="font-size: 10px; color: #999;">missing</span><span class="lane-pill lane-legal">Leg</span></div>
+    </div>
+
+    <div class="panel" style="padding: 12px 14px; margin-top: 10px;">
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span class="pin pin-blocker" style="width:14px;height:14px;font-size:9px;">3</span>
+        <span style="font-size: 11px; font-weight: 500;">Secondary claim — blocker</span>
+      </div>
+      <div style="font-size: 12px; line-height: 1.5; margin-bottom: 8px;">Claim #7 is new content. Not in approved DE base; closest match 0.71.</div>
+      <div style="font-size: 11px; color: #666; border-left: 2px solid rgba(0,0,0,0.15); padding-left: 8px; margin-bottom: 10px;">Compared against 312 approved Velorex claims, DE/EU, last 24 months.</div>
+      <button style="width: 100%;">Annotate in VVPM ↗</button>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

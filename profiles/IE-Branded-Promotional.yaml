@@ -1,0 +1,144 @@
+# IE-Branded-Promotional — drafted, inactive in v1
+#
+# Mirror of UK-Branded-Promotional with IE-specific authorities.
+# Inactive until the IE corpus crosses the coverage minimums on
+# pattern banks. Ships in the catalog now so the engine code path
+# is exercised + the profile YAML schema is validated against a
+# second market.
+
+schema_version: "1.0"
+id: IE-Branded-Promotional
+market: IE
+languages: [en]
+doc_types: [email]
+description: |
+  IE HCP-targeted branded promotional email. Same audience model as
+  UK; differs in pharmacovigilance routing (HPRA, not MHRA),
+  reimbursement disclosure (HSE / GMS / PCRS), and authority code
+  (IPHA Code, not ABPI).
+
+# ─── Detection ─────────────────────────────────────────────────────
+detection:
+  required_metadata:
+    market: IE
+    audience: HCP
+    doc_type: email
+  fallback_signals:
+    filename_patterns:
+      - "*_ie_*.pdf"
+      - "IE *.pdf"
+    extracted_envelope_keys: [audience_restriction, pharmacovigilance]
+    extracted_text_signals:
+      - "HPRA"
+      - "Ireland"
+      - "For Healthcare Professionals in Ireland"
+      - "medsafety.ie"
+
+# ─── Cascade rules ─────────────────────────────────────────────────
+cascade_rules:
+  medical:
+    - r_safety_reminder
+    - r_adr_rate_footnote
+    - r_trial_design_footnote
+    - r_reference_list
+    - r_abbreviations_defined
+  legal:
+    - r_audience_restriction_bar
+    - r_mah_legal_entity
+    - r_unsubscribe_privacy
+    - r_confidentiality_notice
+    - r_kol_conflict_disclosure
+  regulatory:
+    - r_indication_block
+    - r_prescribing_info_bar
+    - r_ae_reporting_box
+    - r_additional_monitoring_symbol
+    - r_approval_code_format
+    - r_date_of_preparation
+    - r_brand_mark_registered
+    - r_ie_reimbursement_note         # ★ IE-specific
+
+# ─── Precheck dependency rules ─────────────────────────────────────
+precheck_dependency_rules:
+  medical:
+    - r_safety_reminder_after_efficacy_claim
+    - r_trial_design_footnote_when_data_cited
+    - r_abbreviations_defined
+    - r_reference_list_complete
+  legal:
+    - r_third_party_disclaimer_when_external_link
+    - r_kol_conflict_disclosure
+    - r_mah_legal_entity_in_footer
+    - r_unsubscribe_privacy_links
+  regulatory:
+    - r_indication_when_drug_named
+    - r_ae_reporting_when_promotional
+    - r_audience_bar_when_hcp_only_profile
+    - r_isi_when_dosing_mentioned
+    - r_third_party_warning_when_external_link
+    - r_approval_code_format
+    - r_date_of_preparation_present_and_fresh
+    - r_prescribing_info_link
+    - r_brand_mark_registered
+    - r_ie_reimbursement_note_when_marketed   # ★ IE-specific
+
+# ─── Auto-insert allowed ───────────────────────────────────────────
+auto_insert_allowed:
+  - r_audience_restriction_bar
+  - r_mah_legal_entity
+  - r_unsubscribe_privacy
+  - r_confidentiality_notice
+  - r_indication_block
+  - r_prescribing_info_bar
+  - r_ae_reporting_box
+  - r_additional_monitoring_symbol
+  - r_brand_mark_registered
+  - r_ie_reimbursement_note          # IE-specific auto-insert
+
+# ─── Rule overrides ────────────────────────────────────────────────
+rule_overrides:
+  r_approval_code_format:
+    code_regex: "(FA-\\d{8}|MAT-IE-\\d{6}|IE/[A-Z]{2}/[A-Z]{2}/\\d{2}/\\d{4})"
+
+  r_ae_reporting_box:
+    expected_authority: "HPRA Pharmacovigilance"
+    expected_url_substring: "medsafety.ie"
+    canonical_url: "https://medsafety.ie"
+  r_ae_reporting_when_promotional:
+    expected_authority: "HPRA Pharmacovigilance"
+    expected_url_substring: "medsafety.ie"
+
+  r_date_of_preparation:
+    freshness_days_warn: 180
+    freshness_days_block: 365
+
+  r_audience_restriction_bar:
+    accepted_text_variants:
+      - "FOR HEALTHCARE PROFESSIONALS IN IRELAND ONLY"
+      - "For Healthcare Professionals in Ireland only"
+      - "Intended for Irish HCPs only"
+
+  r_ie_reimbursement_note:
+    accepted_text_variants:
+      - "{BRAND} is not currently reimbursed in Ireland under the GMS/PCRS schemes."
+      - "{BRAND} is reimbursed in Ireland under the {SCHEME} scheme."
+      - "Reimbursement status: see HSE for details."
+
+# ─── Profile-level metadata ────────────────────────────────────────
+authority: "IPHA Code of Practice 2024"
+authority_clauses_referenced:
+  audience_restriction: "26.1"
+  date_of_preparation:  "4.10"
+  mah_legal_entity:     "4.1"
+  prescribing_info:     "4.1"
+  reference_list:       "9.5"
+  safety_balance:       "5.4"
+  indication:           "5.1"
+  reimbursement:        "HSE / IPHA reimbursement disclosure"
+
+# ─── Status ────────────────────────────────────────────────────────
+status:
+  v1_active: false
+  rationale: "Inactive in v1 — IE corpus not yet ingested. Ships in catalog so the schema validates against a second market and the engine code path is exercised."
+  earliest_corpus_threshold: 15
+  expected_full_coverage_threshold: 25

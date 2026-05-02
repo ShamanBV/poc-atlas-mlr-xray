@@ -1,0 +1,146 @@
+# Non-Branded-Disease-Awareness — drafted, inactive in v1
+#
+# UK disease-education emails that DO NOT name a branded drug. Hard-
+# rejects the indication block requirement (no brand → no SmPC) and
+# loosens approval-code / prescribing-info requirements. Audience
+# restriction still mandatory (HCP-only) but the wording differs from
+# branded promotional ("This educational programme is intended for…").
+#
+# Why it ships drafted-but-inactive: catches the flip side of the
+# branded promotional profile so the engine can detect when a UK email
+# *should* be classified as non-branded (no brand mention, no claim) and
+# reject misclassification as branded promotional. Activates once we
+# have ≥10 approved disease-awareness UK emails in the corpus.
+
+schema_version: "1.0"
+id: Non-Branded-Disease-Awareness
+market: UK
+languages: [en]
+doc_types: [email]
+description: |
+  UK HCP-targeted disease-education email. No brand name appears in
+  any claim or body block. Promotes a disease area, treatment
+  pathway, registry, congress, or educational resource. Less stringent
+  than branded promotional — no indication block, no PI bar, no
+  approval-code requirement. Still requires HCP audience restriction,
+  MAH disclosure if a sponsor is named, and AE reporting reference if
+  any therapy is mentioned.
+
+# ─── Detection ─────────────────────────────────────────────────────
+# Disease-awareness assets are characterised by ABSENCE of brand
+# mentions. The engine should match this profile only when the
+# extracted asset contains zero CLAIM:EFFICACY / CLAIM:COMPARATIVE
+# blocks naming a brand.
+detection:
+  required_metadata:
+    market: UK
+    audience: HCP
+    doc_type: email
+    use_case: disease_awareness        # explicit metadata signal
+  fallback_signals:
+    extracted_block_signals:
+      role_absent: ["CLAIM"]            # no claim blocks
+      brand_token_absent: true          # no uppercase brand-shape token
+    extracted_text_signals:
+      - "education"
+      - "awareness"
+      - "patient pathway"
+      - "registry"
+      - "guideline"
+
+# ─── Cascade rules ─────────────────────────────────────────────────
+cascade_rules:
+  medical:
+    # Reference list still required if the email cites studies / data.
+    - r_reference_list
+    - r_abbreviations_defined
+    # Safety reminder + study-design footnote NOT required — no claim.
+  legal:
+    - r_audience_restriction_bar
+    - r_mah_legal_entity
+    - r_unsubscribe_privacy
+    - r_confidentiality_notice
+    # KOL conflict + ToV apply if the email features a named HCP or
+    # offers hospitality. Cascade triggers handle the predicate; listing
+    # them here keeps them in scope.
+    - r_kol_conflict_disclosure
+  regulatory:
+    # Indication / PI bar / approval-code intentionally OMITTED — no
+    # brand mention means no SmPC reference required.
+    # Date of preparation still required for traceability.
+    - r_date_of_preparation
+    - r_ae_reporting_box           # required if any therapy is mentioned
+
+# ─── Precheck dependency rules ─────────────────────────────────────
+precheck_dependency_rules:
+  medical:
+    - r_abbreviations_defined
+    - r_reference_list_complete
+    # safety_reminder + trial_design predicates won't fire (no claim);
+    # listed for symmetry with cascade.
+  legal:
+    - r_third_party_disclaimer_when_external_link
+    - r_kol_conflict_disclosure
+    - r_mah_legal_entity_in_footer
+    - r_unsubscribe_privacy_links
+  regulatory:
+    # r_indication_when_drug_named will fire if the brand sniff triggers —
+    # if it does, this profile is the WRONG one (the asset isn't really
+    # non-branded). The engine surfaces this as a `block` finding so the
+    # author switches to UK-Branded-Promotional.
+    - r_indication_when_drug_named
+    - r_ae_reporting_when_promotional
+    - r_audience_bar_when_hcp_only_profile
+    - r_third_party_warning_when_external_link
+    - r_date_of_preparation_present_and_fresh
+
+# ─── Auto-insert allowed ───────────────────────────────────────────
+auto_insert_allowed:
+  - r_audience_restriction_bar
+  - r_mah_legal_entity
+  - r_unsubscribe_privacy
+  - r_confidentiality_notice
+  - r_ae_reporting_box
+
+# ─── Rule overrides ────────────────────────────────────────────────
+rule_overrides:
+  r_audience_restriction_bar:
+    accepted_text_variants:
+      - "FOR UK HEALTHCARE PROFESSIONALS ONLY"
+      - "For UK Healthcare Professionals only"
+      - "This educational programme is intended for UK HCPs"
+      - "For HCPs in the United Kingdom"
+
+  r_ae_reporting_box:
+    expected_authority: "MHRA Yellow Card Scheme"
+    expected_url_substring: "yellowcard"
+    # Slightly relaxed — disease-awareness assets can carry a
+    # generic AE reporting reminder without a Yellow-Card link if no
+    # specific therapy is discussed.
+    severity_when_unmet_if_no_therapy_mentioned: warn
+
+  r_date_of_preparation:
+    freshness_days_warn: 365      # 1-year for educational content
+    freshness_days_block: 730
+
+  # The brand-detection rule is critical here — a brand mention should
+  # be a hard block (asset is misclassified as disease-awareness).
+  r_indication_when_drug_named:
+    severity: block
+    rationale_override: "Brand name detected in supposedly non-branded asset. Either remove brand mention OR switch profile to UK-Branded-Promotional."
+
+# ─── Profile-level metadata ────────────────────────────────────────
+authority: "ABPI Code of Practice 2024"
+authority_clauses_referenced:
+  audience_restriction: "26.1"
+  date_of_preparation:  "4.10"
+  mah_legal_entity:     "4.1"
+  reference_list:       "9.5"
+  non_branded_scope:    "26.2 (disease awareness)"
+
+# ─── Status ────────────────────────────────────────────────────────
+status:
+  v1_active: false
+  rationale: "Inactive in v1 — pilot batch is branded promotional only. Activates once ≥10 approved disease-awareness UK emails are ingested. Engine should still load this profile so the misclassification check (`r_indication_when_drug_named` firing on a non-branded asset) catches author errors at extraction time."
+  earliest_corpus_threshold: 10
+  expected_full_coverage_threshold: 20

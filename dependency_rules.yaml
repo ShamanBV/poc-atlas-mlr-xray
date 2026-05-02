@@ -1,0 +1,631 @@
+# MLR Precheck — dependency rule catalog (v1)
+#
+# Author: Shaman Atlas
+# Schema: v1.0
+# First market focus: UK email (HCP-targeted promotional)
+#
+# What this file IS
+#   The catalog of "conditional dependency" rules consumed by the MLR
+#   precheck engine (`src/mlr/precheck/dependency_rules.py`). Each rule
+#   declares a *predicate* (when does this rule apply?) and a
+#   *requirement* (what must be present when it applies). When the
+#   predicate matches and the requirement is unmet, the engine emits a
+#   `Zone` with the rule's id, severity, and rationale.
+#
+# What this file IS NOT
+#   - Not the cascade engine's structural rules (those live in the
+#     cascade obligation spec — 24 rules, fired unconditionally per
+#     compliance profile). Cascade rules check "did the asset include
+#     the obligatory element"; precheck dependency rules check "does
+#     extracted content trigger a NEW requirement that wouldn't
+#     otherwise apply." The two engines are complementary.
+#   - Not the pattern bank (auto-derived from the library, not authored).
+#   - Not the abbreviation glossary (auto-derived from approved
+#     abbreviation blocks).
+#
+# Editing
+#   Adding a rule: append under the appropriate pillar with a new id
+#   (`r_<scope>_<trigger>`). Bump `version` on the next deploy. The
+#   engine validates each rule at startup and refuses to load a
+#   malformed catalog.
+#
+# Coverage
+#   Every rule declares a `coverage` block recording how confident we
+#   are that the predicate + requirement are observable in the corpus.
+#   When `corpus_size_observed < minimum`, the precheck output flags
+#   the verdict with `confidence_label: "low"` so reviewers know the
+#   rule may be misfiring on sparse data.
+
+schema_version: "1.0"
+catalog_version: "v1.0-uk-email-2026-05"
+generated_for_doc_types: ["email"]
+generated_for_markets: ["UK"]      # IE/DE/FR overrides drafted but inactive in v1
+default_severity_when_unmet: warn
+
+# ─────────────────────────────────────────────────────────────────────
+# PREDICATE VOCABULARY
+# ─────────────────────────────────────────────────────────────────────
+# A predicate is a tree of conditions. Each leaf evaluates against the
+# extracted Asset payload (modules / fragments / blocks /
+# supportive_resources / envelope / profile). Composition via
+# `all_of`, `any_of`, `not`.
+#
+# Leaf types:
+#
+# any_module:
+#   claim?:           bool                 # only modules with claim=true
+#   text_matches?:    string (regex)       # claim_text matches regex
+#   text_contains?:   [string]             # claim_text contains any of
+#   subtype_in?:      [string]             # claim subtype in list
+#                                          # (EFFICACY/SAFETY/COMPARATIVE/...)
+#
+# any_block:
+#   role_in?:         [string]             # block role in list
+#   subtype_in?:      [string]
+#   text_matches?:    string (regex)
+#   has_external_link?: bool               # block.links.uri off-domain
+#   font_hierarchy_in?: [string]           # H1/H2/SM/XS/...
+#
+# any_fragment:
+#   role_in?:         [string]             # claim/evidence/context/source/qualifier
+#
+# envelope:
+#   key:              string               # indication / safety / approval_info / ...
+#   present?:         bool                 # default true
+#   text_matches?:    string (regex)
+#   matches_pattern?: { id: string, threshold: float }  # cosine ≥ threshold
+#
+# supportive_resource:
+#   type:             string               # reference-set / footnote-set / ...
+#   present?:         bool
+#   member_count_min?: int
+#
+# profile_in:         [string]             # profile.id ∈ list
+# market_in:          [string]
+# doc_type_in:        [string]
+# language_in:        [string]
+#
+# Composition: any_of | all_of | not   (each takes a list/object)
+#
+# ─────────────────────────────────────────────────────────────────────
+# REQUIREMENT VOCABULARY
+# ─────────────────────────────────────────────────────────────────────
+# `requires` uses the SAME leaf types as predicates — a rule fires
+# missing/drift when its requirement evaluates false against the
+# extracted asset. This keeps the engine implementation symmetric
+# (one predicate evaluator handles both sides).
+#
+# Some requirements add an extra `pattern_id` to demand match against
+# a specific pattern bank entry (vs. just "any envelope text present").
+
+# ─────────────────────────────────────────────────────────────────────
+# RULES — MEDICAL pillar
+# ─────────────────────────────────────────────────────────────────────
+
+medical:
+
+  - id: r_safety_reminder_after_efficacy_claim
+    description: "Efficacy claim must be paired with a safety reminder (or ISI) on the same asset."
+    severity: warn
+    rationale: |
+      Promotional efficacy claims must be balanced with safety
+      information per ABPI Code Clause 5.4 (UK). Atlas flags the
+      claim when no safety reminder block is present.
+    predicate:
+      any_module:
+        claim: true
+        subtype_in: ["EFFICACY", "COMPARATIVE"]
+    requires:
+      any_of:
+        - any_block:
+            role_in: ["SAFETY"]
+        - envelope:
+            key: safety
+            present: true
+    market_overrides:
+      UK: { authority: "ABPI Code 5.4" }
+      IE: { authority: "IPHA Code 5.4" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+      note: "Will activate after ≥10 UK approved emails carry both an efficacy claim and a paired safety block."
+
+  - id: r_trial_design_footnote_when_data_cited
+    description: "Trial-data citation requires a study-design footnote."
+    severity: warn
+    rationale: |
+      When a claim cites trial endpoints with HR / CI / p-value, a
+      study-design footnote describing N, study type, and primary
+      endpoint must appear. ABPI Code Clause 7.2.
+    predicate:
+      any_module:
+        claim: true
+        text_matches: "(HR|hazard ratio|CI|95%\\s*CI|p\\s*[<=]\\s*0?\\.\\d|n\\s*=\\s*\\d+)"
+    requires:
+      any_of:
+        - any_block:
+            role_in: ["BODY"]
+            subtype_in: ["STUDY_DESIGN"]
+        - any_block:
+            role_in: ["FOOTNOTE"]
+            subtype_in: ["STUDY_DESIGN"]
+    market_overrides:
+      UK: { authority: "ABPI Code 7.2" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_abbreviations_defined
+    description: "Every acronym used in body text must be defined in the abbreviation block."
+    severity: warn
+    rationale: |
+      Acronyms appearing in promotional copy must be defined on first
+      use OR collected in an abbreviations block. Engine emits one
+      `layer:abbreviation` zone per offending acronym; this rule
+      backs those findings with a structural requirement.
+    predicate:
+      # The predicate fires unconditionally on any promotional asset.
+      # The detail (which acronym) lives in the abbreviation precheck
+      # layer; this rule guarantees the abbreviation block exists at all.
+      doc_type_in: ["email", "slide"]
+    requires:
+      supportive_resource:
+        type: abbreviation-set
+        present: true
+        member_count_min: 1
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+      note: "Abbreviation blocks observed on ~92% of approved UK emails in pilot batch."
+
+  - id: r_reference_list_complete
+    description: "Every cited reference superscript must resolve to a reference in the reference-set."
+    severity: block
+    rationale: |
+      A claim citing reference [n] must have a corresponding entry in
+      the references list. Missing references are a hard MLR blocker.
+      ABPI Code Clause 9.5.
+    predicate:
+      any_module:
+        # Implicit: module.ref_ids non-empty (engine reads this directly,
+        # no predicate-language sugar yet).
+        claim: true
+    requires:
+      # Engine semantics: every ref_id mentioned in any module's blocks
+      # must resolve to a member of supportive_resources[reference-set].
+      # The "complete" check is engine-internal; the rule simply asserts
+      # the requirement exists.
+      supportive_resource:
+        type: reference-set
+        present: true
+        member_count_min: 1
+    market_overrides:
+      UK: { authority: "ABPI Code 9.5" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+
+# ─────────────────────────────────────────────────────────────────────
+# RULES — LEGAL pillar
+# ─────────────────────────────────────────────────────────────────────
+
+legal:
+
+  - id: r_third_party_disclaimer_when_external_link
+    description: "External link → THIRD_PARTY_DISCLAIMER required."
+    severity: warn
+    rationale: |
+      Any link to a non-brand domain in a promotional email must be
+      accompanied by a third-party disclaimer block. Required to
+      separate brand promotion from external content (ABPI Code 28.1).
+    predicate:
+      any_block:
+        has_external_link: true
+    requires:
+      any_block:
+        role_in: ["DISCLAIMERS"]
+        subtype_in: ["THIRD_PARTY_DISCLAIMER"]
+    market_overrides:
+      UK: { authority: "ABPI Code 28.1" }
+      IE: { authority: "IPHA Code 28.1" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+
+  - id: r_kol_conflict_disclosure
+    description: "Named KOL on event invite → conflict-of-interest disclosure required."
+    severity: warn
+    rationale: |
+      When a healthcare professional is named (e.g. as a speaker), a
+      conflict-of-interest disclosure (or signed declaration) must be
+      included. ABPI Code 24.
+    predicate:
+      all_of:
+        - doc_type_in: ["email"]
+        - any_block:
+            text_matches: "\\b(Prof|Professor|Dr|Doctor)\\.?\\s+[A-Z][a-z]+(\\s+[A-Z][a-z]+){0,2}\\b"
+    requires:
+      any_of:
+        - any_block:
+            role_in: ["DISCLAIMERS"]
+            text_matches: "(conflict of interest|fair market value|FMV|disclosure)"
+        - any_block:
+            text_matches: "(Speaker fees|expenses will be covered|honorar)"
+    market_overrides:
+      UK: { authority: "ABPI Code 24" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+
+  - id: r_tov_disclosure_for_event
+    description: "Event invitation → Transfer of Value disclosure required."
+    severity: block
+    rationale: |
+      Event-promotional materials (invitations, agendas) require a
+      Transfer of Value disclosure stating sponsorship + hospitality
+      provision. ABPI Code Clause 28.
+    predicate:
+      all_of:
+        - profile_in: ["Event-Promotional", "UK-Event-Promotional"]
+        - any_block:
+            text_matches: "(invit|agenda|register|Symposium|Congress|webinar)"
+    requires:
+      any_block:
+        role_in: ["DISCLAIMERS"]
+        text_matches: "(Transfer of Value|ToV|line with ABPI|hospitality)"
+    market_overrides:
+      UK: { authority: "ABPI Code 28" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+
+  - id: r_mah_legal_entity_in_footer
+    description: "Promotional email must show MAH legal entity + registered office in the footer."
+    severity: block
+    rationale: |
+      Marketing Authorisation Holder name + registered office address
+      must appear in every promotional asset. ABPI Code Clause 4.1.
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      any_of:
+        - any_block:
+            role_in: ["CONTACT_INFO"]
+            text_matches: "(Pharmaceuticals|Limited|GmbH|S\\.A\\.|B\\.V\\.|Ltd|Inc)"
+        - envelope:
+            key: disclaimers
+            text_matches: "(Pharmaceuticals|Limited|GmbH|S\\.A\\.|Ltd)"
+    market_overrides:
+      UK: { authority: "ABPI Code 4.1" }
+      IE: { authority: "IPHA Code 4.1" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_unsubscribe_privacy_links
+    description: "Promotional email must include unsubscribe + privacy policy links."
+    severity: block
+    rationale: |
+      GDPR + UK PECR require a working unsubscribe link and a privacy
+      policy reference in every commercial email.
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      all_of:
+        - envelope:
+            key: unsubscribe
+            present: true
+        - any_of:
+            - any_block:
+                role_in: ["DISCLAIMERS"]
+                subtype_in: ["PRIVACY"]
+            - envelope:
+                key: disclaimers
+                text_matches: "(privacy policy|privacy notice|data protection)"
+    market_overrides:
+      UK: { authority: "UK GDPR + PECR" }
+      IE: { authority: "EU GDPR + ePrivacy" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+
+# ─────────────────────────────────────────────────────────────────────
+# RULES — REGULATORY pillar
+# ─────────────────────────────────────────────────────────────────────
+
+regulatory:
+
+  - id: r_indication_when_drug_named
+    description: "Branded drug named in claim → indication block required."
+    severity: block
+    rationale: |
+      Promotional content mentioning a branded drug name must carry
+      an indication statement aligned to the SmPC. ABPI Code 5.1.
+    predicate:
+      any_module:
+        claim: true
+        # Brand sniff: any uppercase token of 4+ chars optionally followed
+        # by ®. The engine refines via the customer's brand dictionary.
+        text_matches: "\\b[A-Z]{4,}(?:®)?\\b"
+    requires:
+      envelope:
+        key: indication
+        present: true
+        # Once the pattern bank is populated, also require the indication
+        # text to match an approved variant ≥0.95.
+        # Inactive in v1.0 — see coverage.note.
+        # matches_pattern: { id: "uk_email_indication_<brand>", threshold: 0.95 }
+    market_overrides:
+      UK: { authority: "ABPI Code 5.1" }
+      IE: { authority: "IPHA Code 5.1" }
+      DE: { authority: "AKG Code §3" }
+      FR: { authority: "Charte de l'information promotionnelle 1.4" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+      note: "Indication-text pattern matching (matches_pattern) deferred until ≥10 approved indication variants per brand are ingested."
+
+  - id: r_ae_reporting_when_promotional
+    description: "Promotional asset → AE reporting routing for the market."
+    severity: block
+    rationale: |
+      Every promotional asset must carry adverse-event reporting
+      instructions routing to the local pharmacovigilance authority.
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      envelope:
+        key: pharmacovigilance
+        present: true
+    market_overrides:
+      UK:
+        authority: "MHRA Yellow Card Scheme"
+        expected_authority_in_block: "MHRA"
+        expected_url_substring: "yellowcard"
+      IE:
+        authority: "HPRA Pharmacovigilance"
+        expected_authority_in_block: "HPRA"
+        expected_url_substring: "medsafety.ie"
+      DE:
+        authority: "BfArM"
+        expected_authority_in_block: "BfArM"
+      FR:
+        authority: "ANSM"
+        expected_authority_in_block: "ANSM"
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_audience_bar_when_hcp_only_profile
+    description: "HCP-only profile → audience-restriction bar required."
+    severity: block
+    rationale: |
+      UK and IE HCP-only promotional materials must display a "For UK
+      Healthcare Professionals Only" (or equivalent) restriction bar.
+      ABPI Code Clause 26.1 (UK).
+    predicate:
+      profile_in:
+        - "UK-Branded-Promotional"
+        - "IE-Branded-Promotional"
+        - "UK-Event-Promotional"
+    requires:
+      envelope:
+        key: audience_restriction
+        present: true
+    market_overrides:
+      UK: { authority: "ABPI Code 26.1" }
+      IE: { authority: "IPHA Code 26.1" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_isi_when_dosing_mentioned
+    description: "Dosing copy → ISI / Important Safety Information required."
+    severity: warn
+    rationale: |
+      When dosing/administration is described in promotional copy,
+      Important Safety Information (or a SAFETY:DOSING block) must be
+      present in the same asset.
+    predicate:
+      any_block:
+        text_matches: "(\\bdose\\b|\\bdosing\\b|\\binjection\\b|\\binfusion\\b|\\bmg/kg\\b|\\bonce[\\s-]?daily\\b|\\bBID\\b)"
+    requires:
+      any_of:
+        - any_block:
+            role_in: ["SAFETY"]
+            subtype_in: ["ISI", "DOSING"]
+        - envelope:
+            key: safety
+            present: true
+    market_overrides:
+      UK: { authority: "ABPI Code 5.4" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+
+  - id: r_third_party_warning_when_external_link
+    # Note: parallels the LEGAL r_third_party_disclaimer_when_external_link
+    # but framed as the regulatory-side "user is leaving brand domain"
+    # warning. The two often co-fire on the same external link; the engine
+    # de-dupes by zone bbox + rule_id pair.
+    description: "External link in body → 'leaving brand site' warning required."
+    severity: warn
+    rationale: |
+      Veeva / regulatory expectation: an external link from a
+      promotional email must be accompanied by a non-Novartis-website
+      warning before the click-through.
+    predicate:
+      any_block:
+        has_external_link: true
+    requires:
+      any_block:
+        text_matches: "(non-Novartis|non-Takeda|external website|leaving|third[- ]party site)"
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+
+  - id: r_approval_code_format
+    description: "Approval code present + matches profile-specific regex."
+    severity: block
+    rationale: |
+      Every promotional asset must carry an approval code matching the
+      market/MAH-specific format (e.g. "FA-XXXXXXXX" for Novartis UK).
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      envelope:
+        key: approval_info
+        text_matches: "(FA-\\d{8}|MAT-[A-Z]{2}-\\d{6}|UK/[A-Z]{2}/[A-Z]{2}/\\d{2}/\\d{4}|CC[A-Z0-9]{4,8})"
+    market_overrides:
+      UK:
+        authority: "MHRA / MAH approval-code convention"
+        # Per-customer regex overrides will be added once we have ≥3 customers
+        # active in the same market.
+      IE: { authority: "IPHA / MAH approval code convention" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+      note: "Regex set is the union of formats observed in pilot UK assets; tighten per customer once ≥10 of each."
+
+  - id: r_date_of_preparation_present_and_fresh
+    description: "Date of preparation present + ≤180 days old."
+    severity: warn
+    rationale: |
+      ABPI Code Clause 4.10 (UK) — every promotional item carries a
+      date of preparation in the footer. Fresh threshold (180 days) is
+      Atlas-internal; below it surfaces as `warn`, beyond surfaces as
+      `block`.
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      envelope:
+        key: approval_info
+        text_matches: "([A-Z][a-z]{2,8}\\s+\\d{4}|\\d{1,2}/\\d{2,4}|\\d{4}-\\d{2}-\\d{2})"
+        # Engine extracts and normalises date; freshness check is post-regex.
+    market_overrides:
+      UK:
+        authority: "ABPI Code 4.10"
+        freshness_days_warn: 180
+        freshness_days_block: 365
+      IE:
+        authority: "IPHA Code 4.10"
+        freshness_days_warn: 180
+        freshness_days_block: 365
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_prescribing_info_link
+    description: "Promotional email must link to prescribing information (SmPC)."
+    severity: block
+    rationale: |
+      Atlas requires a click-through to PI / SmPC from every
+      promotional asset (header or footer placement).
+    predicate:
+      doc_type_in: ["email"]
+    requires:
+      any_of:
+        - envelope:
+            key: prescribing_information
+            present: true
+        - any_block:
+            role_in: ["REGULATORY_MENU"]
+            subtype_in: ["PI", "SMPC"]
+    market_overrides:
+      UK: { authority: "ABPI Code 4.1" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 10
+
+  - id: r_brand_mark_registered
+    description: "Branded drug name must carry ® on first use."
+    severity: warn
+    rationale: |
+      Trademark / IP guidance — first use of the brand name in a
+      promotional asset should carry the ® mark.
+    predicate:
+      any_module:
+        claim: true
+        text_matches: "\\b[A-Z]{4,}\\b"
+    requires:
+      # The engine implementation handles "first occurrence" — the rule
+      # just asserts the ® is present somewhere on the brand token.
+      any_block:
+        text_matches: "®"
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+      note: "Auto-insertable: Atlas can suggest ® placement when missing."
+
+  - id: r_aifa_deposit_reference_for_italy
+    description: "Italian promotional email → AIFA deposit code + date."
+    severity: block
+    rationale: |
+      Italian AIFA regulation requires the deposit code (Numero AIFA)
+      and date of deposit on every promotional item targeted to IT.
+    predicate:
+      market_in: ["IT"]
+    requires:
+      envelope:
+        key: approval_info
+        text_matches: "(Depositato presso AIFA|Numero AIFA|in data \\d{1,2}/\\d{2,4})"
+    market_overrides:
+      IT: { authority: "AIFA — D.Lgs. 219/2006 art. 119" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+      note: "Inactive for UK v1; ships in catalog for when IT corpus comes online."
+
+  - id: r_ie_reimbursement_note_when_marketed
+    description: "Irish promotional email mentioning prescribing → reimbursement disclosure."
+    severity: warn
+    rationale: |
+      Irish HSE-funded promotional materials must declare reimbursement
+      status (GMS/PCRS) for the medicinal product.
+    predicate:
+      all_of:
+        - market_in: ["IE"]
+        - any_block:
+            text_matches: "(prescrib|treatment|patients receiving)"
+    requires:
+      any_block:
+        text_matches: "(reimburs|GMS|PCRS|HSE)"
+    market_overrides:
+      IE: { authority: "HSE / IPHA reimbursement disclosure" }
+    coverage:
+      corpus_size_observed: 0
+      minimum: 5
+      note: "Inactive for UK v1; ships for when IE corpus comes online."
+
+
+# ─────────────────────────────────────────────────────────────────────
+# OPERATIONAL NOTES
+# ─────────────────────────────────────────────────────────────────────
+# 1. Activation gate — a rule with `corpus_size_observed < minimum` is
+#    LOADED but its findings carry `confidence_label: "low"` until the
+#    corpus catches up. UI badges them with a small "early signal" tag.
+#
+# 2. De-duplication — when two rules' requirements would generate the
+#    same Zone (e.g. both legal + regulatory third-party-link rules
+#    trigger off the same external link), the engine merges them into
+#    one Zone with `lanes: ["L", "R"]` and `dependencies_triggered`
+#    listing both rule_ids.
+#
+# 3. Auto-insertion — rules marked `auto_insertable: true` (planned for
+#    v1.5) let Atlas propose the missing block from a canonical
+#    template; the reviewer confirms in VVPM. v1.0 is observe-only.
+#
+# 4. Per-customer overrides — when ≥3 customers are active in the same
+#    market, fork the catalog into `dependency_rules.<customer>.yaml`
+#    with the same schema; engine merges with this base catalog by id.
+#
+# 5. Cascade alignment — each rule should NOT duplicate a cascade rule
+#    of the same name. If the cascade has `r_audience_restriction_bar`
+#    that fires unconditionally per profile, the precheck dependency
+#    rule `r_audience_bar_when_hcp_only_profile` is the predicate-
+#    triggered companion (different id, different scope). The engine
+#    treats them as independent verdicts; the X-Ray UI shows both
+#    with their `layer` ("cascade" vs "regulatory") so the source is
+#    visible.
