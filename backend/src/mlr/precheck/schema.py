@@ -218,6 +218,20 @@ class ExtractedModule(BaseModel):
     ref_ids: list[str] = Field(default_factory=list)
 
 
+class ExtractedVisual(BaseModel):
+    """A figure / image / chart from the extractor's visual pass."""
+
+    id: str
+    type: str = "figure"          # figure / chart / table / brand-mark
+    page: Optional[int] = None    # 1-indexed
+    bbox: Optional[BoundingBox] = None
+    kind: Optional[str] = None    # LOGO / BANNER / HERO / DIAGRAM / …
+    description: Optional[str] = None
+    appears_to_carry_claim: bool = False
+    link_uri: Optional[str] = None  # if the visual is a hyperlink
+    link_visible_text: Optional[str] = None
+
+
 class SupportiveResource(BaseModel):
     type: str  # "abbreviation-set" | "reference-set" | "footnote-set" | …
     members: list[dict] = Field(default_factory=list)
@@ -231,6 +245,7 @@ class ExtractedAsset(BaseModel):
     profile_id: str  # selected upstream from (brand, market, doc_type)
     modules: list[ExtractedModule] = Field(default_factory=list)
     blocks: list[ExtractedBlock] = Field(default_factory=list)
+    visuals: list[ExtractedVisual] = Field(default_factory=list)
     supportive_resources: list[SupportiveResource] = Field(default_factory=list)
     envelope: dict = Field(default_factory=dict)  # indication / safety / approval_info / ...
 

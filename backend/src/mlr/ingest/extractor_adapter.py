@@ -52,6 +52,7 @@ from mlr.precheck.schema import (
     ExtractedBlock,
     ExtractedFragment,
     ExtractedModule,
+    ExtractedVisual,
     SupportiveResource,
 )
 
@@ -314,6 +315,24 @@ def _meta_from_extractor(asset_raw: dict, today: date | None = None) -> AssetMet
 # ─── public entrypoint ───────────────────────────────────────────────
 
 
+def _visual_from_extractor(raw: dict) -> ExtractedVisual:
+    """One extractor visual entry → one ExtractedVisual."""
+    raw_page = raw.get("page")
+    page = (raw_page + 1) if isinstance(raw_page, int) else None
+    link = raw.get("link") or {}
+    return ExtractedVisual(
+        id=raw["id"],
+        type=raw.get("type", "figure"),
+        page=page,
+        bbox=_bbox_from_list(raw.get("bbox")),
+        kind=raw.get("kind"),
+        description=raw.get("description"),
+        appears_to_carry_claim=bool(raw.get("appears_to_carry_claim", False)),
+        link_uri=link.get("uri") if isinstance(link, dict) else None,
+        link_visible_text=link.get("visible_text") if isinstance(link, dict) else None,
+    )
+
+
 def adapt(extraction: dict, *, asset_id: str, pdf_path: str | None = None) -> ExtractedAsset:
     """
     Convert one extractor `extraction.json` dict into an `ExtractedAsset`.
@@ -328,6 +347,7 @@ def adapt(extraction: dict, *, asset_id: str, pdf_path: str | None = None) -> Ex
     asset_raw = extraction.get("asset") or {}
     blocks = [_block_from_extractor(b) for b in extraction.get("blocks", [])]
     modules = [_module_from_extractor(m) for m in extraction.get("modules", [])]
+    visuals = [_visual_from_extractor(v) for v in extraction.get("visuals", [])]
     resources = _supportive_from_extractor(extraction.get("supportive_resources", []))
     envelope = _envelope_from_extractor(extraction.get("document_regulatory", {}))
 
@@ -340,6 +360,7 @@ def adapt(extraction: dict, *, asset_id: str, pdf_path: str | None = None) -> Ex
         profile_id=profile_id,
         modules=modules,
         blocks=blocks,
+        visuals=visuals,
         supportive_resources=resources,
         envelope=envelope,
         pdf_path=pdf_path,

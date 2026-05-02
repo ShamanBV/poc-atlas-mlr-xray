@@ -22,6 +22,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 
+from mlr.api_views.document_xray import to_document_xray
 from mlr.fixtures import assets as fixture_assets
 from mlr.ingest import library_bootstrap
 from mlr.precheck import abbreviation_check, claim_check, document_check, library
@@ -125,6 +126,37 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
         pdf_url=f"/api/preview/{asset_id}.pdf",
         page_count=1,
     )
+
+
+@app.get("/api/document-xray/{asset_id}")
+def get_document_xray(asset_id: str) -> dict:
+    """
+    Document X-Ray payload — the new primary view (replaces the
+    /api/precheck route as the frontend's data source).
+
+    Runs all 3 precheck layers, then hands the asset + verdicts to the
+    Document X-Ray adapter. Returns claims[] + elements[] +
+    compliance_findings[] per the design handoff at
+    `design_handoff_atlas_extraction/design_handoff_document_xray/`.
+    """
+    extracted = fixture_assets.get(asset_id)
+    if extracted is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "asset_not_found",
+                    "message": f"No asset with id '{asset_id}'.",
+                }
+            },
+        )
+
+    verdicts = [
+        *claim_check.run(extracted),
+        *document_check.run(extracted, _CATALOG),
+        *abbreviation_check.run(extracted),
+    ]
+    return to_document_xray(extracted, verdicts)
 
 
 @app.get("/api/assets")
