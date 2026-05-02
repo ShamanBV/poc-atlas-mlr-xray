@@ -19,15 +19,22 @@ from mlr.precheck.schema import (
     AssetMeta,
     ExtractedAsset,
     ExtractedBlock,
+    ExtractedFragment,
+    ExtractedModule,
     SupportiveResource,
 )
 
 
 # ─── KISQALI UK demo asset ────────────────────────────────────────────
 #
-# Body text deliberately uses AE, ORR, HR+, HER2- without defining all
-# of them — the fixture's abbreviation-set defines HR, CI, OS, PFS so
-# the precheck flags AE, ORR, HR+, HER2- as undefined.
+# Aligned with the §6 sample payload in MLR_PRECHECK_API.md:
+#   - Body text uses AE, ORR, HR+, HER2- but the abbreviation-set only
+#     defines HR / CI / OS / PFS / ET → Layer 3 emits 4 abbreviation zones.
+#   - envelope.audience_restriction is INTENTIONALLY ABSENT → Layer 2
+#     `r_audience_bar_when_hcp_only_profile` fires `miss` / `block`.
+#   - No SAFETY block + no envelope.safety → Layer 2
+#     `r_safety_reminder_after_efficacy_claim` fires `miss` / `warn`.
+#   - Modules wrap the CLAIM block(s) so `any_module:` predicates match.
 
 KISQALI_UK_001 = ExtractedAsset(
     asset_id="tmp:demo-kisqali-uk-001",
@@ -42,12 +49,31 @@ KISQALI_UK_001 = ExtractedAsset(
         age_days=49,
     ),
     profile_id="UK-Branded-Promotional",
+    modules=[
+        ExtractedModule(
+            id="mod_efficacy_001",
+            claim=True,
+            subtype="EFFICACY",
+            synthesized_text=(
+                "At 5 years, KISQALI® + ET reduced the risk of recurrence by 25.2% "
+                "vs ET alone (HR 0.748, 95% CI 0.618–0.906; p=0.0014)."
+            ),
+            block_ids=["blk_002"],
+            fragments=[
+                ExtractedFragment(role="claim", text="KISQALI® + ET reduced the risk of recurrence by 25.2%", block_id="blk_002"),
+                ExtractedFragment(role="evidence", text="HR 0.748, 95% CI 0.618–0.906; p=0.0014", block_id="blk_002"),
+                ExtractedFragment(role="context", text="At 5 years, vs ET alone", block_id="blk_002"),
+            ],
+            ref_ids=["ref_1"],
+        ),
+    ],
     blocks=[
         ExtractedBlock(
             id="blk_001",
             role="HEADER",
             text="KISQALI® (ribociclib) — your patients with HR+/HER2- early breast cancer",
             page=1,
+            font_hierarchy="H1",
         ),
         ExtractedBlock(
             id="blk_002",
@@ -58,6 +84,7 @@ KISQALI_UK_001 = ExtractedAsset(
                 "vs ET alone (HR 0.748, 95% CI 0.618–0.906; p=0.0014)."
             ),
             page=1,
+            font_hierarchy="H2",
         ),
         ExtractedBlock(
             id="blk_003",
@@ -68,12 +95,14 @@ KISQALI_UK_001 = ExtractedAsset(
                 "subgroups. PFS data continue to mature."
             ),
             page=1,
+            font_hierarchy="BODY",
         ),
         ExtractedBlock(
             id="blk_004",
             role="CTA",
             text="See the latest data",
             page=1,
+            font_hierarchy="BODY",
         ),
         ExtractedBlock(
             id="blk_005",
@@ -84,12 +113,14 @@ KISQALI_UK_001 = ExtractedAsset(
                 "evaluating KISQALI® + ET vs ET alone in HR+/HER2- early breast cancer."
             ),
             page=1,
+            font_hierarchy="SM",
         ),
         ExtractedBlock(
             id="blk_006",
             role="CONTACT_INFO",
             text="Novartis Pharmaceuticals UK Limited · Frimley Business Park · Camberley GU16 7SR",
             page=1,
+            font_hierarchy="SM",
         ),
     ],
     supportive_resources=[
@@ -116,14 +147,14 @@ KISQALI_UK_001 = ExtractedAsset(
     envelope={
         "indication": "KISQALI® is indicated for HR+/HER2- early breast cancer at high risk of recurrence.",
         "approval_info": "FA-11551654 · March 2026",
-        "audience_restriction": "FOR UK HEALTHCARE PROFESSIONALS ONLY",
+        # `audience_restriction` intentionally absent — Layer 2 should flag.
         "pharmacovigilance": (
             "Adverse events should be reported. Reporting forms and information "
             "can be found at https://yellowcard.mhra.gov.uk."
         ),
         "prescribing_information": "https://novartis.example/uk/kisqali-pi",
         "unsubscribe": "https://novartis.example/unsubscribe",
-        "disclaimers": "Privacy policy: https://novartis.example/privacy",
+        "disclaimers": "See our privacy policy at https://novartis.example/privacy.",
     },
 )
 

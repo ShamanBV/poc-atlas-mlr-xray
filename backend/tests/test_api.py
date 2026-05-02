@@ -14,6 +14,8 @@ def test_health():
     body = r.json()
     assert body["ok"] is True
     assert "tmp:demo-kisqali-uk-001" in body["fixtures"]
+    assert body["rules_loaded"] >= 17
+    assert body["catalog_version"]
 
 
 def test_precheck_returns_asset_payload():
@@ -99,3 +101,40 @@ def test_verdict_label_consistent_with_severities():
         assert asset["verdict"] == "Warn"
     else:
         assert asset["verdict"] == "Pass"
+
+
+def test_layer2_regulatory_zone_present():
+    """Audience-bar miss should appear with regulatory:r_audience_bar_… sub_layer."""
+    r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
+    asset = r.json()
+    audience_zone = next(
+        (z for z in asset["zones"] if z["sub_layer"] == "regulatory:r_audience_bar_when_hcp_only_profile"),
+        None,
+    )
+    assert audience_zone is not None, [z["sub_layer"] for z in asset["zones"]]
+    assert audience_zone["layer"] == "regulatory"
+    assert audience_zone["status"] == "miss"
+    assert audience_zone["severity"] == "block"
+    assert audience_zone["lanes"] == ["R"]
+
+
+def test_layer2_medical_pillar_zone_present():
+    """Safety-reminder miss should attribute to medical pillar via sub_layer prefix."""
+    r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
+    asset = r.json()
+    safety_zone = next(
+        (z for z in asset["zones"] if z["sub_layer"] == "medical:r_safety_reminder_after_efficacy_claim"),
+        None,
+    )
+    assert safety_zone is not None
+    assert safety_zone["lanes"] == ["M"]
+    assert safety_zone["severity"] == "warn"
+
+
+def test_overall_score_reflects_block_finding():
+    """A regulatory `block` deducts 20pt; medical pillar takes warn deductions."""
+    r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
+    asset = r.json()
+    assert asset["scores"]["regulatory"] == 80   # one block × 20pt
+    assert asset["scores"]["medical"] < 100      # 1 warn (Layer 2) + 4 warns (Layer 3)
+    assert asset["verdict"] == "Fail"

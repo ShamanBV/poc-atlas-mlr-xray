@@ -20,20 +20,25 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from mlr.fixtures import assets as fixture_assets
-from mlr.precheck import abbreviation_check
+from mlr.precheck import abbreviation_check, document_check
 from mlr.precheck.asset_builder import build_asset
+from mlr.precheck.dependency_rules import load_default_catalog
 from mlr.precheck.schema import Asset, ErrorBody, ErrorResponse
 
 
 app = FastAPI(
     title="Atlas MLR Precheck POC",
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Server-side slice for the Atlas MLR X-Ray POC. Implements the "
-        "Layer 3 (abbreviation precheck) end-to-end against an in-memory "
-        "fixture store."
+        "Server-side slice for the Atlas MLR X-Ray POC. Implements "
+        "Layer 2 (regulatory dependency rules) + Layer 3 (abbreviation "
+        "precheck) end-to-end against an in-memory fixture store."
     ),
 )
+
+
+# Catalog loaded once at app boot — we don't need hot-reload for the POC.
+_CATALOG = load_default_catalog()
 
 
 def _error(http_status: int, code: str, message: str) -> JSONResponse:
@@ -72,11 +77,11 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
             },
         )
 
+    document_verdicts = document_check.run(extracted, _CATALOG)
     abbreviation_verdicts = abbreviation_check.run(extracted)
 
-    # Future: claim_check + document_check + cascade_adapter all append
-    # into the verdict list before build_asset.
-    verdicts = list(abbreviation_verdicts)
+    # Future: claim_check + cascade_adapter append into the verdict list.
+    verdicts = [*document_verdicts, *abbreviation_verdicts]
 
     return build_asset(
         extracted=extracted,
@@ -91,4 +96,9 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
 @app.get("/api/health")
 def health() -> dict:
     """Liveness probe."""
-    return {"ok": True, "fixtures": fixture_assets.all_ids()}
+    return {
+        "ok": True,
+        "fixtures": fixture_assets.all_ids(),
+        "rules_loaded": len(_CATALOG.rules),
+        "catalog_version": _CATALOG.catalog_version,
+    }

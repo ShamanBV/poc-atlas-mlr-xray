@@ -187,6 +187,28 @@ class ExtractedBlock(BaseModel):
     text: str
     page: Optional[int] = None
     bbox: Optional[BoundingBox] = None
+    font_hierarchy: Optional[str] = None  # "H1" | "H2" | "BODY" | "SM" | …
+    links: list[str] = Field(default_factory=list)  # off-domain URIs in the block
+
+
+class ExtractedFragment(BaseModel):
+    """A claim/evidence/context/source/qualifier fragment within a module."""
+
+    role: str  # "claim" | "evidence" | "context" | "source" | "qualifier"
+    text: str
+    block_id: Optional[str] = None  # back-link to the originating block
+
+
+class ExtractedModule(BaseModel):
+    """A logical claim group containing claim + evidence + context fragments."""
+
+    id: str
+    claim: bool = False  # is this a claim module?
+    subtype: Optional[str] = None  # EFFICACY | SAFETY | COMPARATIVE | …
+    synthesized_text: str = ""  # concatenated module text used by `text_matches`
+    block_ids: list[str] = Field(default_factory=list)
+    fragments: list[ExtractedFragment] = Field(default_factory=list)
+    ref_ids: list[str] = Field(default_factory=list)
 
 
 class SupportiveResource(BaseModel):
@@ -200,6 +222,7 @@ class ExtractedAsset(BaseModel):
     asset_id: str
     meta: AssetMeta
     profile_id: str  # selected upstream from (brand, market, doc_type)
+    modules: list[ExtractedModule] = Field(default_factory=list)
     blocks: list[ExtractedBlock] = Field(default_factory=list)
     supportive_resources: list[SupportiveResource] = Field(default_factory=list)
     envelope: dict = Field(default_factory=dict)  # indication / safety / approval_info / ...

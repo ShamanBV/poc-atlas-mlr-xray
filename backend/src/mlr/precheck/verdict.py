@@ -77,30 +77,30 @@ class Verdict:
 
 
 def pillar_for(verdict: Verdict) -> str:
-    """Returns 'medical' | 'legal' | 'regulatory'."""
+    """
+    Returns 'medical' | 'legal' | 'regulatory'.
+
+    Layer 2 (`layer:regulatory`) emits sub_layers prefixed with the
+    rule's pillar — `medical:r_xxx` / `legal:r_xxx` / `regulatory:r_xxx`
+    — so the prefix is the source of truth for routing.
+    """
     if verdict.layer == "abbreviation":
         return "medical"
     if verdict.layer == "claim":
         return "medical"
     if verdict.layer == "regulatory":
-        # Sub-layer namespace decides legal vs regulatory split.
-        # Convention: sub_layer "regulatory:audience_restriction" → regulatory,
-        #             sub_layer "legal:disclaimer" → legal.
+        if verdict.sub_layer.startswith("medical:"):
+            return "medical"
         if verdict.sub_layer.startswith("legal:"):
             return "legal"
         return "regulatory"
     if verdict.layer == "cascade":
-        # Cascade rule_ids encode the pillar in the dependencies_triggered
-        # list. Default to regulatory if we can't resolve.
-        for dep in verdict.dependencies_triggered:
-            rid = dep.rule_id
-            # Convention from cascade catalog: rules nest under medical/legal/regulatory
-            # in the YAML; the engine stamps the pillar before emitting.
-            # The verdict's annotation_draft / sub_layer carries it.
-            if "legal" in verdict.sub_layer:
-                return "legal"
-            if "medical" in verdict.sub_layer:
-                return "medical"
+        # Same prefix convention as Layer 2 — cascade adapter stamps the
+        # pillar in sub_layer when emitting.
+        if verdict.sub_layer.startswith("medical:"):
+            return "medical"
+        if verdict.sub_layer.startswith("legal:"):
+            return "legal"
         return "regulatory"
     return "medical"
 

@@ -5,12 +5,18 @@ in `../MLR_PRECHECK_API.md` against an in-memory fixture store.
 
 ## Status
 
-**v0.1 — Layer 3 (abbreviation precheck) end-to-end.**
+**v0.2 — Layer 2 (regulatory dependency rules) + Layer 3 (abbreviation precheck) end-to-end.**
 
 What ships in this slice:
 
 - `GET /api/precheck/{asset_id}` returns a full `Asset` payload built from
   fixture-stored extracted assets.
+- Layer 2 (`document_check.py` + `dependency_rules.py`) loads
+  `../dependency_rules.yaml` at boot, runs each rule's predicate +
+  requires against the extracted asset, emits one `Zone` per
+  fired-but-unmet rule with `dependencies_triggered` carrying the rule
+  id, prose predicate, and corpus coverage. Pillar attribution
+  (medical / legal / regulatory) routes via `sub_layer` prefix.
 - Layer 3 (`abbreviation_check.py`) walks the asset's blocks, extracts
   acronyms, looks each up in the canonical glossary, and emits one
   `Zone` per acronym used in body text but not defined in the asset's
@@ -22,8 +28,11 @@ What's stubbed in this slice (filled in by later layers):
 
 - Layer 1 (claim precheck) — adds `layer:claim` zones via embedding +
   cosine match against approved corpus.
-- Layer 2 (regulatory precheck) — adds `layer:regulatory` zones via
-  the dependency-rule predicate evaluator + envelope pattern bank.
+- Pattern-bank match (`envelope.matches_pattern`) — needs library
+  ingest infra; predicate currently treats it as always-satisfied.
+- Date-of-preparation freshness window — currently checks regex
+  presence only; freshness comparison vs `today` lands with the date
+  normaliser.
 - Cascade adapter — bridges to the existing cascade engine, adds
   `layer:cascade` zones.
 
@@ -54,16 +63,20 @@ backend/
 ├── README.md            ← you are here
 ├── src/mlr/
 │   ├── precheck/
-│   │   ├── schema.py            ← Pydantic models (Asset/Zone/EmailBlock/...)
-│   │   ├── glossary.py          ← canonical acronym → expansion lookup
+│   │   ├── schema.py             ← Pydantic models (Asset/Zone/EmailBlock/...)
+│   │   ├── glossary.py           ← canonical acronym → expansion lookup
 │   │   ├── abbreviation_check.py ← Layer 3 logic
-│   │   ├── verdict.py           ← internal verdict shape + aggregator
-│   │   ├── asset_builder.py     ← verdicts → Asset envelope
-│   │   └── api.py               ← FastAPI routes
+│   │   ├── dependency_rules.py   ← YAML loader + predicate evaluator
+│   │   ├── document_check.py     ← Layer 2 orchestrator
+│   │   ├── verdict.py            ← internal verdict shape + aggregator
+│   │   ├── asset_builder.py      ← verdicts → Asset envelope
+│   │   └── api.py                ← FastAPI routes
 │   └── fixtures/
-│       └── assets.py            ← in-memory store of extracted assets
+│       └── assets.py             ← in-memory store of extracted assets
 └── tests/
     ├── test_glossary.py
     ├── test_abbreviation_check.py
+    ├── test_dependency_rules.py
+    ├── test_document_check.py
     └── test_api.py
 ```
