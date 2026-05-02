@@ -1,6 +1,6 @@
 [project]
 name = "mlr-precheck-poc"
-version = "0.2.0"
+version = "0.3.0"
 description = "Atlas MLR X-Ray POC backend — precheck engine + FastAPI surface"
 requires-python = ">=3.11"
 dependencies = [

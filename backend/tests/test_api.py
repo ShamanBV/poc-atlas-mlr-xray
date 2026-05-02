@@ -136,5 +136,32 @@ def test_overall_score_reflects_block_finding():
     r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
     asset = r.json()
     assert asset["scores"]["regulatory"] == 80   # one block × 20pt
-    assert asset["scores"]["medical"] < 100      # 1 warn (Layer 2) + 4 warns (Layer 3)
+    assert asset["scores"]["medical"] < 100      # claim drift + safety warn + 4 abbreviation warns
     assert asset["verdict"] == "Fail"
+
+
+def test_layer1_claim_drift_zone_present():
+    """Efficacy claim drift should appear with claim:efficacy sub_layer + a diff."""
+    r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
+    asset = r.json()
+    claim_zone = next(
+        (z for z in asset["zones"] if z["sub_layer"] == "claim:efficacy"),
+        None,
+    )
+    assert claim_zone is not None
+    assert claim_zone["layer"] == "claim"
+    assert claim_zone["status"] == "attn"
+    assert claim_zone["severity"] == "warn"
+    assert claim_zone["diff"] is not None
+    assert claim_zone["pattern_base"] is not None
+    assert claim_zone["pattern_base"]["pattern_id"] == "uk_email_efficacy_HR_CI"
+    assert claim_zone["lanes"] == ["M"]
+    assert claim_zone["vvpm_anchor"] == "anchor_blk_002"
+
+
+def test_library_size_surfaced_in_asset_payload():
+    r = client.get("/api/precheck/tmp:demo-kisqali-uk-001")
+    asset = r.json()
+    assert asset["library"]["sample_size"] >= 1
+    # Sample size is far below 20 in this slice → coverage_warning expected.
+    assert asset["library"]["coverage_warning"] is not None
