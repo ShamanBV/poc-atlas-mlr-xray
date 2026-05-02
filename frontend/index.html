@@ -13,13 +13,13 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; overflow: hidden; }
-    body { font-family: 'Noto Sans', sans-serif; background: #FBFBFB; color: #323232; font-size: 14px; }
+    body { font-family: 'Noto Sans', sans-serif; background: #FAFAFA; color: #1F1F1F; font-size: 14px; }
     .mono { font-family: 'JetBrains Mono', monospace; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #D7D7D7; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #9FA3A4; }
-    textarea:focus { border-color: #00A66F !important; }
+    ::-webkit-scrollbar-thumb { background: #C7C7C7; border-radius: 3px; }     /* grey.300 */
+    ::-webkit-scrollbar-thumb:hover { background: #A0A0A0; }                  /* grey.400 */
+    textarea:focus { border-color: #00A66F !important; }                      /* primary.500 */
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     .pill {
@@ -28,15 +28,15 @@
     }
     .pill.dot { width: 6px; height: 6px; border-radius: 50%; padding: 0; }
 
-    /* Backend-status banner */
+    /* Backend-status banner — restricted palette */
     #backend-banner {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      background: #1A1A2E; color: #fff; font-family: 'JetBrains Mono', monospace;
+      background: #1F1F1F; color: #FAFAFA; font-family: 'JetBrains Mono', monospace;
       font-size: 11px; padding: 5px 12px; display: flex; align-items: center; gap: 12px;
     }
-    #backend-banner .ok    { color: #47C18E; }
-    #backend-banner .err   { color: #FF6B6B; }
-    #backend-banner code   { color: #C1E8D6; }
+    #backend-banner .ok    { color: #9DD5B8; }   /* primary.300 */
+    #backend-banner .err   { color: #DB2777; }   /* critical.600 */
+    #backend-banner code   { color: #C1E8D6; }   /* primary.200 */
   </style>
 </head>
 <body>
@@ -49,6 +49,94 @@
 
 <script type="text/babel" data-presets="env,react">
 const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── RESTRICTED PALETTE ───────────────────────────────────────────────────────
+// Per design directive: greens (primary.50–.800), greys (.50–.800), warning
+// yellow.600, critical pink.600. Everything else (purple/brown/red/orange/blue
+// in the original prototype) maps onto these tokens.
+//
+// Mutation strategy: the prototype's helpers (`statusColor`, `laneToken`, …)
+// were defined in XRayData.jsx, closing over the local `C` object. The script
+// then exposes that same object reference as `window.C`. We MUTATE C's
+// properties below — the helpers' references are unchanged but their reads
+// now return the new values. The same is done for nested laneM/L/R objects.
+const PALETTE = {
+  // Greens
+  primary50:  '#F6FCF9',
+  primary100: '#E5F6EE',
+  primary200: '#C1E8D6',
+  primary300: '#9DD5B8',
+  primary400: '#47C18E',
+  primary500: '#00A66F',  // Shaman brand
+  primary600: '#008859',
+  primary700: '#006A45',
+  primary800: '#004D31',
+  // Greys
+  grey50:  '#FAFAFA',
+  grey100: '#F0F0F0',
+  grey200: '#E0E0E0',
+  grey300: '#C7C7C7',
+  grey400: '#A0A0A0',
+  grey500: '#7A7A7A',
+  grey600: '#525252',
+  grey700: '#3A3A3A',
+  grey800: '#1F1F1F',
+  // Status accents
+  warning600: '#D97706',
+  warning100: '#FEF3C7',
+  warning300: '#FCD34D',
+  critical600: '#DB2777',
+  critical100: '#FCE7F3',
+  critical300: '#F9A8D4',
+  white: '#FFFFFF',
+};
+
+(function applyRestrictedPalette() {
+  const C = window.C;
+  if (!C) return;  // XRayData.jsx not loaded yet — should never happen
+  Object.assign(C, {
+    // Brand greens (kept names for prototype compatibility)
+    green600: PALETTE.primary500,
+    green400: PALETTE.primary400,
+    green100: PALETTE.primary200,
+    green50:  PALETTE.primary100,
+    green25:  PALETTE.primary50,
+    // Status — clean → primary; attn → warning yellow; miss → critical pink
+    clean:       PALETTE.primary600,
+    cleanBg:     PALETTE.primary50,
+    cleanBorder: PALETTE.primary300,
+    attn:        PALETTE.warning600,
+    attnBg:      PALETTE.warning100,
+    attnBorder:  PALETTE.warning300,
+    miss:        PALETTE.critical600,
+    missBg:      PALETTE.critical100,
+    missBorder:  PALETTE.critical300,
+    // Greys (prototype names → restricted greys)
+    grey900: PALETTE.grey800,
+    grey800: PALETTE.grey700,
+    grey700: PALETTE.grey600,
+    grey600: PALETTE.grey500,
+    grey500: PALETTE.grey500,
+    grey400: PALETTE.grey400,
+    grey300: PALETTE.grey400,
+    grey200: PALETTE.grey300,
+    grey100: PALETTE.grey200,
+    grey50:  PALETTE.grey100,
+    grey25:  PALETTE.grey50,
+    white:   PALETTE.white,
+    // Misc — diff additions / removals; old "blue" repurposed
+    blue:     PALETTE.primary500,
+    blueBg:   PALETTE.primary50,
+    addGreen: PALETTE.primary100,
+    addText:  PALETTE.primary700,
+    redLight: PALETTE.critical100,
+  });
+  // Lane chips — distinguished by intensity within the restricted palette.
+  // Mutate in place so lane tokens captured by the helpers see the new values.
+  Object.assign(C.laneM, { bg: PALETTE.primary100, text: PALETTE.primary700 });
+  Object.assign(C.laneL, { bg: PALETTE.grey100,    text: PALETTE.grey700    });
+  Object.assign(C.laneR, { bg: PALETTE.grey200,    text: PALETTE.grey800    });
+})();
 
 // ─── BACKEND CONFIG ───────────────────────────────────────────────────────────
 // Default: localhost:8088 (uvicorn). Override via ?api= query string.
@@ -74,6 +162,38 @@ async function fetchPrecheck(assetId) {
   }
   return r.json();
 }
+
+// ─── PDF EMAIL PREVIEW ────────────────────────────────────────────────────────
+// Replaces the prototype's brand-specific hardcoded React components
+// (KisqaliEmail / LeqvioEmail / JakaviEmail) with an iframe of the
+// real source PDF served by GET /api/preview/{asset_id}.pdf.
+//
+// Trade-off: zone hover/click cross-linking with the X-Ray drawer is
+// disabled here — the PDF is opaque to React. Once pipeline_v5 emits
+// bbox-bound zones, layer a transparent overlay div on top of the
+// iframe with one absolute-positioned hotspot per zone.bbox.
+const PdfEmailPreview = ({ asset, pdfUrl, emailRef }) => (
+  <div ref={emailRef} style={{
+    flex:1, background:PALETTE.grey100, overflowY:'auto',
+    display:'flex', flexDirection:'column', alignItems:'center',
+    padding:'20px 20px 8px',
+  }}>
+    <div style={{
+      width:'100%', maxWidth:520, height:'calc(100% - 36px)',
+      background:PALETTE.white, borderRadius:4, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
+      overflow:'hidden', display:'flex', flexDirection:'column',
+    }}>
+      <iframe
+        src={pdfUrl + '#view=FitH&toolbar=0'}
+        style={{ flex:1, width:'100%', border:'none', background:PALETTE.white }}
+        title={`${asset.meta.brand} ${asset.meta.market} preview`}
+      />
+    </div>
+    <div style={{ marginTop:10, fontSize:11, color:PALETTE.grey400, textAlign:'center', lineHeight:1.6 }}>
+      Source PDF · zone overlay arrives with pipeline_v5 bboxes
+    </div>
+  </div>
+);
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const App = () => {
@@ -117,18 +237,18 @@ const App = () => {
         height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
         flexDirection:'column', gap:12, padding:40, textAlign:'center',
       }}>
-        <div style={{ fontSize:24, fontWeight:600, color:'#A32D2D' }}>
+        <div style={{ fontSize:24, fontWeight:600, color:PALETTE.critical600 }}>
           Backend unreachable
         </div>
-        <div style={{ fontSize:14, color:'#6F7E7F', maxWidth:560 }}>
+        <div style={{ fontSize:14, color:PALETTE.grey500, maxWidth:560 }}>
           {error.message}
         </div>
-        <div style={{ fontSize:12, color:'#9FA3A4', fontFamily:'JetBrains Mono, monospace', marginTop:8 }}>
+        <div style={{ fontSize:12, color:PALETTE.grey400, fontFamily:'JetBrains Mono, monospace', marginTop:8 }}>
           {error.code}
         </div>
-        <div style={{ fontSize:13, color:'#454747', marginTop:20, lineHeight:1.6 }}>
+        <div style={{ fontSize:13, color:PALETTE.grey700, marginTop:20, lineHeight:1.6 }}>
           Start the backend: <code style={{
-            background:'#EFEFEF', padding:'2px 8px', borderRadius:4,
+            background:PALETTE.grey100, padding:'2px 8px', borderRadius:4,
             fontFamily:'JetBrains Mono, monospace', fontSize:12,
           }}>cd backend && uvicorn mlr.precheck.api:app --port 8088</code>
         </div>
@@ -140,10 +260,11 @@ const App = () => {
     return (
       <div style={{
         height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
-        gap:12, color:'#6F7E7F', fontSize:14,
+        gap:12, color:PALETTE.grey500, fontSize:14,
       }}>
         <div style={{
-          width:18, height:18, border:'2px solid #C1E8D6', borderTopColor:'#00A66F',
+          width:18, height:18, border:`2px solid ${PALETTE.primary200}`,
+          borderTopColor:PALETTE.primary500,
           borderRadius:'50%', animation:'spin 0.8s linear infinite',
         }}/>
         Loading precheck for {ASSET_ID}…
@@ -162,11 +283,11 @@ const App = () => {
     <div style={{ height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', paddingTop:24 }}>
 
       {/* Top header */}
-      <div style={{ height:56, background:'#C1E8D6', display:'flex', alignItems:'center', flexShrink:0, zIndex:10 }}>
-        <div style={{ width:56, height:56, background:'#00A66F', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+      <div style={{ height:56, background:PALETTE.primary200, display:'flex', alignItems:'center', flexShrink:0, zIndex:10 }}>
+        <div style={{ width:56, height:56, background:PALETTE.primary500, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <img src="assets/shaman-icon.svg" alt="Shaman" style={{ width:32, height:32, filter:'brightness(0) invert(1)' }}/>
         </div>
-        <span style={{ fontSize:18, fontWeight:500, color:'#00A66F', padding:'0 16px' }}>Shaman Atlas MLR X-Ray</span>
+        <span style={{ fontSize:18, fontWeight:500, color:PALETTE.primary600, padding:'0 16px' }}>Shaman Atlas MLR X-Ray</span>
         <div style={{ flex:1 }}/>
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'0 16px' }}>
           <div onClick={()=>setDrawerOpen(true)} style={{
@@ -174,7 +295,7 @@ const App = () => {
             background:statusBgCol, border:`1px solid ${statusCol}33`,
             borderRadius:6, padding:'4px 12px', cursor:'pointer',
           }}>
-            <span style={{ fontSize:11, color:'#6F7E7F' }}>Precheck</span>
+            <span style={{ fontSize:11, color:PALETTE.grey500 }}>Precheck</span>
             <span style={{ fontSize:16, fontWeight:700, color:statusCol, fontVariantNumeric:'tabular-nums' }}>{asset.scores.overall}</span>
             <span style={{ fontSize:11, fontWeight:600, color:statusCol }}>{statusLabel}</span>
           </div>
@@ -183,8 +304,8 @@ const App = () => {
 
       {/* Body */}
       <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
-        <EmailPreview asset={asset} hoveredZone={hoveredZone} selectedZone={selectedZone}
-          onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+        <PdfEmailPreview asset={asset} pdfUrl={`${BACKEND}${asset.preview?.pdf_url || ''}`}
+          emailRef={emailRef}/>
 
         {drawerOpen && (
           <Drawer asset={asset} role="reviewer" onClose={()=>setDrawerOpen(false)}
@@ -195,7 +316,7 @@ const App = () => {
         {!drawerOpen && (
           <div onClick={()=>setDrawerOpen(true)} style={{
             position:'absolute', right:0, top:'50%', transform:'translateY(-50%)',
-            background:'#00A66F', color:'#fff', borderRadius:'6px 0 0 6px',
+            background:PALETTE.primary500, color:PALETTE.white, borderRadius:'6px 0 0 6px',
             padding:'12px 5px', cursor:'pointer', writingMode:'vertical-rl',
             fontSize:10, fontWeight:700, letterSpacing:0.8, textTransform:'uppercase',
             display:'flex', alignItems:'center', gap:5,

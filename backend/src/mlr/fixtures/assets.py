@@ -49,6 +49,15 @@ KISQALI_UK_001 = ExtractedAsset(
         age_days=49,
     ),
     profile_id="UK-Branded-Promotional",
+    # Real source PDF lives in the extractor-service test corpus. The
+    # extracted blocks/modules/envelope below are still synthetic for
+    # the POC — wiring the actual extractor pipeline output for this
+    # PDF is the next slice. For now this gives the X-Ray UI a real
+    # email to display in the left preview pane.
+    pdf_path=(
+        "/Users/mauricevanleeuwen/Development/dev_projects/extractor-service/"
+        "test_sets/emails/UK - KISQALI - 2025 - 5-year data KTE.pdf"
+    ),
     modules=[
         ExtractedModule(
             id="mod_efficacy_001",

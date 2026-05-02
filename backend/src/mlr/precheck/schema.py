@@ -226,3 +226,8 @@ class ExtractedAsset(BaseModel):
     blocks: list[ExtractedBlock] = Field(default_factory=list)
     supportive_resources: list[SupportiveResource] = Field(default_factory=list)
     envelope: dict = Field(default_factory=dict)  # indication / safety / approval_info / ...
+
+    # Local filesystem path to the source PDF, used by the
+    # GET /api/preview/{asset_id}.pdf route. None means no preview
+    # available for this asset (the route returns 404).
+    pdf_path: Optional[str] = None

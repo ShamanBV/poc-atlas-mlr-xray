@@ -335,6 +335,39 @@ zone with a bbox-bound block; populate `EmailBlock.pin` to match.
 
 ## Fixture choices
 
+### D22 — PDF preview served via FastAPI; rendered with browser-native viewer
+
+**Current value:** `GET /api/preview/{asset_id}.pdf` streams the file
+mapped from `ExtractedAsset.pdf_path`; frontend renders via `<iframe
+src="…#view=FitH&toolbar=0">`.
+**Where:** `src/mlr/precheck/api.py` → `get_preview_pdf`;
+`frontend/index.html` → `PdfEmailPreview`.
+**Why this value:** zero deps (no PDF.js bundle), works in every modern
+browser, demos the real pharma email rather than a synthetic mock-up
+HTML. Native browser viewer handles scroll/zoom/print for free.
+**How to revise:** if reviewers need overlay annotations on the PDF
+(zone hotspots, comment pins), drop in PDF.js with a transparent
+overlay div and one absolute-positioned hotspot per `Zone.bbox`.
+**Status:** `pinned`.
+
+### D23 — Real PDF preview + synthetic extracted content (temporary mismatch)
+
+**Current value:** the left pane renders the *real* KISQALI 5-year-data
+PDF; the right-pane verdicts are computed from *synthetic* fixture data
+that doesn't match the PDF's actual claim text (PDF: "28.4% with NSAI";
+fixture: "25.2% with ET alone").
+**Where:** `src/mlr/fixtures/assets.py` → `KISQALI_UK_001`.
+**Why this value:** demonstrates the API + UI shape end-to-end while
+keeping the §6 sample-payload-aligned drift case for the demo. Running
+the actual extractor pipeline on the PDF and feeding real extracted
+text into the precheck is the next slice.
+**How to revise:** wire `pipeline_v5` (or `pipeline_v4` for slides)
+output into the fixture builder; replace the hardcoded `modules` /
+`blocks` / `envelope` with the live extractor's output for this PDF.
+The library's canonical KISQALI claim text will need to be updated to
+match a real approved variant once we ingest one.
+**Status:** `pinned` (intentional temporary state).
+
 ### D21 — KISQALI fixture intentional gaps
 
 **Current value:** `envelope.audience_restriction` and the SAFETY block

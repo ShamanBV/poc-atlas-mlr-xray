@@ -16,9 +16,11 @@ Auth and Veeva brokering omitted — POC runs unauthenticated locally.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from mlr.fixtures import assets as fixture_assets
 from mlr.precheck import abbreviation_check, claim_check, document_check, library
@@ -103,6 +105,45 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
         library_sample_size=library.total_size(),
         pdf_url=f"/api/preview/{asset_id}.pdf",
         page_count=1,
+    )
+
+
+@app.get("/api/preview/{asset_id}.pdf")
+def get_preview_pdf(asset_id: str):
+    """
+    Stream the source PDF for a given asset_id.
+
+    Looks up the fixture's `pdf_path`; returns 404 if either the asset
+    is unknown or no PDF is wired up. The response sets
+    `Content-Disposition: inline` so browsers render the PDF in-place
+    via their built-in viewer (no PDF.js dep needed for the POC).
+    """
+    extracted = fixture_assets.get(asset_id)
+    if extracted is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "asset_not_found", "message": f"No asset '{asset_id}'."}},
+        )
+    if not extracted.pdf_path:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "preview_not_available", "message": "No PDF wired for this asset."}},
+        )
+    pdf_path = Path(extracted.pdf_path)
+    if not pdf_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "preview_file_missing",
+                    "message": f"PDF file not found on disk: {pdf_path}",
+                }
+            },
+        )
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{pdf_path.name}"'},
     )
 
 
