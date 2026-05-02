@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MLR X-Ray — Shaman (live backend)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+  <script src="adapter.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; overflow: hidden; }
+    body { font-family: 'Noto Sans', sans-serif; background: #FBFBFB; color: #323232; font-size: 14px; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D7D7D7; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9FA3A4; }
+    textarea:focus { border-color: #00A66F !important; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+      border-radius: 12px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px;
+    }
+    .pill.dot { width: 6px; height: 6px; border-radius: 50%; padding: 0; }
+
+    /* Backend-status banner */
+    #backend-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: #1A1A2E; color: #fff; font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; padding: 5px 12px; display: flex; align-items: center; gap: 12px;
+    }
+    #backend-banner .ok    { color: #47C18E; }
+    #backend-banner .err   { color: #FF6B6B; }
+    #backend-banner code   { color: #C1E8D6; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<div id="backend-banner">backend: <span id="backend-status">connecting…</span></div>
+
+<script type="text/babel" src="XRayData.jsx"></script>
+<script type="text/babel" src="XRayEmail.jsx"></script>
+<script type="text/babel" src="XRayDrawer.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── BACKEND CONFIG ───────────────────────────────────────────────────────────
+// Default: localhost:8088 (uvicorn). Override via ?api= query string.
+const params = new URLSearchParams(window.location.search);
+const BACKEND = params.get('api') || 'http://localhost:8088';
+const ASSET_ID = params.get('asset') || 'tmp:demo-kisqali-uk-001';
+
+function setBackendStatus(html, kind) {
+  const el = document.getElementById('backend-status');
+  el.innerHTML = html;
+  el.className = kind || '';
+}
+
+async function fetchPrecheck(assetId) {
+  const url = `${BACKEND}/api/precheck/${encodeURIComponent(assetId)}`;
+  const r = await fetch(url);
+  if (!r.ok) {
+    let body;
+    try { body = await r.json(); } catch (_) { body = { error: { code: 'http_' + r.status, message: r.statusText } }; }
+    const e = new Error(body?.detail?.error?.message || body?.error?.message || `HTTP ${r.status}`);
+    e.code = body?.detail?.error?.code || body?.error?.code || `http_${r.status}`;
+    throw e;
+  }
+  return r.json();
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+const App = () => {
+  const [asset, setAsset]           = useState(null);
+  const [error, setError]           = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [hoveredZone, setHoveredZone] = useState(null);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const emailRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBackendStatus('connecting…');
+    fetchPrecheck(ASSET_ID)
+      .then(raw => {
+        if (cancelled) return;
+        const adapted = window.adaptBackendAsset(raw);
+        setAsset(adapted);
+        setBackendStatus(
+          `<span class="ok">●</span> ${BACKEND} · asset <code>${ASSET_ID}</code> · ` +
+          `${raw.zones.length} zones · verdict ${raw.verdict} · score ${raw.scores.overall} · ` +
+          `library n=${raw.library.sample_size}`,
+          'ok',
+        );
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setError(e);
+        setBackendStatus(
+          `<span class="err">●</span> ${BACKEND} unreachable: ${e.message}`,
+          'err',
+        );
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── loading + error states ───────────────────────────────────────────────
+  if (error) {
+    return (
+      <div style={{
+        height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+        flexDirection:'column', gap:12, padding:40, textAlign:'center',
+      }}>
+        <div style={{ fontSize:24, fontWeight:600, color:'#A32D2D' }}>
+          Backend unreachable
+        </div>
+        <div style={{ fontSize:14, color:'#6F7E7F', maxWidth:560 }}>
+          {error.message}
+        </div>
+        <div style={{ fontSize:12, color:'#9FA3A4', fontFamily:'JetBrains Mono, monospace', marginTop:8 }}>
+          {error.code}
+        </div>
+        <div style={{ fontSize:13, color:'#454747', marginTop:20, lineHeight:1.6 }}>
+          Start the backend: <code style={{
+            background:'#EFEFEF', padding:'2px 8px', borderRadius:4,
+            fontFamily:'JetBrains Mono, monospace', fontSize:12,
+          }}>cd backend && uvicorn mlr.precheck.api:app --port 8088</code>
+        </div>
+      </div>
+    );
+  }
+
+  if (!asset) {
+    return (
+      <div style={{
+        height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+        gap:12, color:'#6F7E7F', fontSize:14,
+      }}>
+        <div style={{
+          width:18, height:18, border:'2px solid #C1E8D6', borderTopColor:'#00A66F',
+          borderRadius:'50%', animation:'spin 0.8s linear infinite',
+        }}/>
+        Loading precheck for {ASSET_ID}…
+      </div>
+    );
+  }
+
+  // ── header status pill ───────────────────────────────────────────────────
+  const missing = asset.zones.filter(z=>z.status==='miss').length;
+  const attn    = asset.zones.filter(z=>z.status==='attn').length;
+  const statusLabel = missing>0?`Fail · ${missing} missing`:attn>0?`Warn · ${attn} attention`:'Pass';
+  const statusCol   = missing>0?C.miss:attn>0?C.attn:C.clean;
+  const statusBgCol = missing>0?C.missBg:attn>0?C.attnBg:C.cleanBg;
+
+  return (
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', paddingTop:24 }}>
+
+      {/* Top header */}
+      <div style={{ height:56, background:'#C1E8D6', display:'flex', alignItems:'center', flexShrink:0, zIndex:10 }}>
+        <div style={{ width:56, height:56, background:'#00A66F', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <img src="assets/shaman-icon.svg" alt="Shaman" style={{ width:32, height:32, filter:'brightness(0) invert(1)' }}/>
+        </div>
+        <span style={{ fontSize:18, fontWeight:500, color:'#00A66F', padding:'0 16px' }}>Shaman Atlas MLR X-Ray</span>
+        <div style={{ flex:1 }}/>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'0 16px' }}>
+          <div onClick={()=>setDrawerOpen(true)} style={{
+            display:'flex', alignItems:'center', gap:7,
+            background:statusBgCol, border:`1px solid ${statusCol}33`,
+            borderRadius:6, padding:'4px 12px', cursor:'pointer',
+          }}>
+            <span style={{ fontSize:11, color:'#6F7E7F' }}>Precheck</span>
+            <span style={{ fontSize:16, fontWeight:700, color:statusCol, fontVariantNumeric:'tabular-nums' }}>{asset.scores.overall}</span>
+            <span style={{ fontSize:11, fontWeight:600, color:statusCol }}>{statusLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
+        <EmailPreview asset={asset} hoveredZone={hoveredZone} selectedZone={selectedZone}
+          onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+
+        {drawerOpen && (
+          <Drawer asset={asset} role="reviewer" onClose={()=>setDrawerOpen(false)}
+            hoveredZone={hoveredZone} selectedZone={selectedZone}
+            onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+        )}
+
+        {!drawerOpen && (
+          <div onClick={()=>setDrawerOpen(true)} style={{
+            position:'absolute', right:0, top:'50%', transform:'translateY(-50%)',
+            background:'#00A66F', color:'#fff', borderRadius:'6px 0 0 6px',
+            padding:'12px 5px', cursor:'pointer', writingMode:'vertical-rl',
+            fontSize:10, fontWeight:700, letterSpacing:0.8, textTransform:'uppercase',
+            display:'flex', alignItems:'center', gap:5,
+          }}>
+            <span className="material-icons" style={{ fontSize:13, transform:'rotate(90deg)', writingMode:'horizontal-tb' }}>science</span>
+            X-Ray
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

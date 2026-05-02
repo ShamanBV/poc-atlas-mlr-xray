@@ -17,6 +17,7 @@ Auth and Veeva brokering omitted — POC runs unauthenticated locally.
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from mlr.fixtures import assets as fixture_assets
@@ -35,6 +36,16 @@ app = FastAPI(
         "and Layer 3 (abbreviation precheck) end-to-end against an "
         "in-memory fixture store."
     ),
+)
+
+
+# POC permits any origin so the static frontend can be opened from
+# `file://` or any localhost dev server. Tighten before shipping.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 
