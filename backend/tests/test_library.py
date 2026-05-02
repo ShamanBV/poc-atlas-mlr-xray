@@ -22,8 +22,14 @@ def test_find_candidates_returns_empty_for_unknown_market():
 
 
 def test_find_candidates_handles_none_subtype():
-    """Modules with unclassified subtype should yield no candidates."""
-    assert library.find_candidates("KISQALI", "UK", None) == []
+    """
+    Modules with unclassified subtype fall back to "match any subtype"
+    on the brand+market — keeps coarsely-classified real-world modules
+    in scope rather than silently dropping them.
+    """
+    cands = library.find_candidates("KISQALI", "UK", None)
+    assert cands, "expected ≥1 candidate for KISQALI/UK regardless of subtype"
+    assert all(c.brand == "KISQALI" and c.market == "UK" for c in cands)
 
 
 def test_lookup_pattern_returns_first_variant():

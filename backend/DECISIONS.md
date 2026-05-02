@@ -350,6 +350,63 @@ HTML. Native browser viewer handles scroll/zoom/print for free.
 overlay div and one absolute-positioned hotspot per `Zone.bbox`.
 **Status:** `pinned`.
 
+### D24 — Claim subtype derived via keyword classifier in adapter
+
+**Current value:** the extractor service doesn't yet stamp
+EFFICACY/SAFETY/COMPARATIVE/DOSING on claim blocks, so the adapter
+applies a small regex-based classifier on `synthesized_text`
+(SAFETY: `adverse|safety|tolerab|...`; DOSING: `\d+\s*mg|dose|...`;
+COMPARATIVE: `vs|versus|...`; EFFICACY: `HR|95% CI|reduced|response|...`).
+Modules that don't match any pattern get `subtype = None`.
+**Where:** `src/mlr/ingest/extractor_adapter.py` → `_claim_subtype`.
+**Why this value:** lets Layer 1 + the bootstrapped library bucket
+claims even when the upstream extractor doesn't classify. Verified on
+the Scemblix UK fixture — the heuristic correctly identifies efficacy
+/ dosing / safety claims.
+**How to revise:** once the extractor emits `block.subtype` for CLAIM
+blocks, prefer the upstream value and use the heuristic only as a
+fallback when subtype is missing. For now the heuristic is the only
+source.
+**Status:** `pinned`.
+
+### D25 — Library bootstrapped from extractor outputs (option B)
+
+**Current value:** `mlr.ingest.library_bootstrap.bootstrap_from_dir`
+walks every `*.extraction.json` in `eval_atlas_20260430T172755Z/` and
+turns each claim module's `synthesized_text` into an `ApprovedClaim`
+(deduped by exact text within each `(brand, market, subtype)` slice).
+The active library is set to the bootstrap result on app boot if the
+directory exists; otherwise the hardcoded 3-entry fallback stays.
+**Where:** `src/mlr/ingest/library_bootstrap.py`,
+`src/mlr/precheck/library.py` → `set_library` /  `reset_library`,
+`src/mlr/precheck/api.py` → `_bootstrap_library_at_startup`.
+**Why this value:** we don't yet have a curated MLR-blessed canonical
+corpus per (brand, market, subtype). Treating the existing 24 UK
+extractions as "approved" gives Layer 1 a real population to compare
+against — noisy but better than no library. With the Cosentyx demo
+asset, this produces a mix of clean matches + drift verdicts on real
+text (verified end-to-end).
+**How to revise:** once a real MLR-approved canonical corpus lands
+(via the Vault → Atlas piece-by-piece approval flow per
+`MLR_PRECHECK_SPEC.md` §6), swap `bootstrap_from_dir` for a loader
+that reads the curated store. The `library.set_library` API stays
+the same.
+**Status:** `pinned` (intentional temporary state).
+
+### D26 — Real-data fixtures loaded via adapter at app boot
+
+**Current value:** `mlr.fixtures.assets._load_real_assets` lazily loads
+3 real fixtures (COSENTYX, SCEMBLIX, KISQALI) from the
+extractor-service eval directory at module import. Synthetic KISQALI
+fixture stays in the store too.
+**Where:** `src/mlr/fixtures/assets.py`.
+**Why this value:** fastest path from extractor JSON to live demo.
+Failing-soft on missing files lets the test suite (and CI / fresh
+checkouts) keep working without the extractor data on disk.
+**How to revise:** swap for an Atlas-API client once a live extractor
+service is reachable from the precheck backend.
+**Status:** `pinned`.
+
 ### D23 — Real PDF preview + synthetic extracted content (temporary mismatch)
 
 **Current value:** the left pane renders the *real* KISQALI 5-year-data

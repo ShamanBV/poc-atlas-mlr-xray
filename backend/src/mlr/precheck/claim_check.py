@@ -64,7 +64,7 @@ def _verdict_for_match(
     drift_min: float,
 ) -> Verdict:
     """Build a Verdict for a (module, best_canonical, similarity) triple."""
-    subtype = (module.subtype or "claim").lower()
+    subtype = (module.subtype or "general").lower()
     sub_layer = f"claim:{subtype}"
 
     if score >= clean_min:
@@ -76,7 +76,7 @@ def _verdict_for_match(
         )
         diff = None
         annotation_draft = None
-        label = f"{(module.subtype or 'Claim').title()} claim — match"
+        label = f"Claim ({(module.subtype or 'general').lower()}) — match"
     elif score >= drift_min:
         status, severity = "attn", "warn"
         evidence = f"Partial match · {score:.2f}"
@@ -87,11 +87,11 @@ def _verdict_for_match(
         )
         diff = word_diff(module.synthesized_text, canonical.text)
         annotation_draft = (
-            f"{(module.subtype or 'Claim').title()} claim shows phrasing drift "
+            f"Claim ({(module.subtype or 'general').lower()}) shows phrasing drift "
             f"vs approved canonical (similarity {score:.2f}). Consider reverting "
             f"to: \"{canonical.text}\""
         )
-        label = f"{(module.subtype or 'Claim').title()} claim — drift"
+        label = f"Claim ({(module.subtype or 'general').lower()}) — drift"
     else:
         status, severity = "miss", "block"
         evidence = f"No close match · {score:.2f}"
@@ -103,11 +103,11 @@ def _verdict_for_match(
         )
         diff = word_diff(module.synthesized_text, canonical.text)
         annotation_draft = (
-            f"{(module.subtype or 'Claim').title()} claim does not match any "
+            f"Claim ({(module.subtype or 'general').lower()}) does not match any "
             f"approved canonical above the {drift_min:.2f} similarity floor. "
             f"Submit for MLR review or align with: \"{canonical.text}\""
         )
-        label = f"{(module.subtype or 'Claim').title()} claim — no canonical match"
+        label = f"Claim ({(module.subtype or 'general').lower()}) — no canonical match"
 
     pattern_base = PatternBase(
         pattern_id=canonical.pattern_id,

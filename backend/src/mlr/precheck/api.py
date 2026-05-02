@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from mlr.fixtures import assets as fixture_assets
+from mlr.ingest import library_bootstrap
 from mlr.precheck import abbreviation_check, claim_check, document_check, library
 from mlr.precheck.asset_builder import build_asset
 from mlr.precheck.dependency_rules import load_default_catalog
@@ -53,6 +54,23 @@ app.add_middleware(
 
 # Catalog loaded once at app boot — we don't need hot-reload for the POC.
 _CATALOG = load_default_catalog()
+
+
+# Bootstrap the approved-claim library from the extractor service's
+# eval outputs (option B in DECISIONS.md D5/D25). When the directory
+# isn't present (fresh checkout, CI), the hardcoded library stays as
+# the fallback.
+def _bootstrap_library_at_startup() -> int:
+    extractions_dir = fixture_assets._EXTRACTOR_OUTPUTS  # noqa: SLF001 — POC convenience
+    if not extractions_dir.is_dir():
+        return library.total_size()
+    bootstrapped = library_bootstrap.bootstrap_from_dir(extractions_dir)
+    if bootstrapped:
+        library.set_library(bootstrapped)
+    return library.total_size()
+
+
+_LIBRARY_SIZE_AT_BOOT = _bootstrap_library_at_startup()
 
 
 def _error(http_status: int, code: str, message: str) -> JSONResponse:
@@ -108,6 +126,32 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
     )
 
 
+@app.get("/api/assets")
+def list_assets() -> list[dict]:
+    """
+    Lightweight asset directory for the frontend's switcher panel.
+
+    Returns one entry per fixture with the bare minimum the UI needs to
+    render a list (asset_id + brand + market + doc_type + identity-ish
+    label). The full Asset payload is only computed when the user
+    selects an asset (via GET /api/precheck/{asset_id}).
+    """
+    out: list[dict] = []
+    for a in fixture_assets.all_assets():
+        out.append({
+            "asset_id": a.asset_id,
+            "brand": a.meta.brand,
+            "market": a.meta.market,
+            "language": a.meta.language,
+            "doc_type": a.meta.doc_type,
+            "code": a.meta.code,
+            "prepared": a.meta.prepared,
+            "label": f"{a.meta.brand} · {a.meta.market} · {a.meta.doc_type}",
+            "has_pdf": bool(a.pdf_path),
+        })
+    return out
+
+
 @app.get("/api/preview/{asset_id}.pdf")
 def get_preview_pdf(asset_id: str):
     """
@@ -156,4 +200,5 @@ def health() -> dict:
         "rules_loaded": len(_CATALOG.rules),
         "catalog_version": _CATALOG.catalog_version,
         "library_size": library.total_size(),
+        "library_bootstrapped": library.total_size() != 3,  # 3 = the hardcoded fallback
     }

@@ -37,6 +37,13 @@
     #backend-banner .ok    { color: #9DD5B8; }   /* primary.300 */
     #backend-banner .err   { color: #DB2777; }   /* critical.600 */
     #backend-banner code   { color: #C1E8D6; }   /* primary.200 */
+    #backend-banner select {
+      background: transparent; color: #9DD5B8; border: 1px solid #525252;
+      border-radius: 3px; padding: 2px 4px; font-family: inherit; font-size: 11px;
+      cursor: pointer; outline: none;
+    }
+    #backend-banner select:hover { border-color: #9DD5B8; }
+    #backend-banner select option { color: #1F1F1F; background: #FAFAFA; }
   </style>
 </head>
 <body>
@@ -142,16 +149,18 @@ const PALETTE = {
 // Default: localhost:8088 (uvicorn). Override via ?api= query string.
 const params = new URLSearchParams(window.location.search);
 const BACKEND = params.get('api') || 'http://localhost:8088';
-const ASSET_ID = params.get('asset') || 'tmp:demo-kisqali-uk-001';
+// Default to the Cosentyx real fixture — biggest claim count → most
+// interesting Layer 1 surface. ?asset=… overrides; the in-page <select>
+// also writes to history.replaceState so the URL reflects current.
+const INITIAL_ASSET_ID = params.get('asset') || 'real:cosentyx-uk-rheum-mda-001';
 
-function setBackendStatus(html, kind) {
+function renderBannerStatus(html, kind) {
   const el = document.getElementById('backend-status');
   el.innerHTML = html;
   el.className = kind || '';
 }
 
-async function fetchPrecheck(assetId) {
-  const url = `${BACKEND}/api/precheck/${encodeURIComponent(assetId)}`;
+async function fetchJson(url) {
   const r = await fetch(url);
   if (!r.ok) {
     let body;
@@ -162,6 +171,11 @@ async function fetchPrecheck(assetId) {
   }
   return r.json();
 }
+
+const fetchPrecheck = (assetId) =>
+  fetchJson(`${BACKEND}/api/precheck/${encodeURIComponent(assetId)}`);
+const fetchAssetList = () =>
+  fetchJson(`${BACKEND}/api/assets`);
 
 // ─── PDF EMAIL PREVIEW ────────────────────────────────────────────────────────
 // Replaces the prototype's brand-specific hardcoded React components
@@ -197,6 +211,8 @@ const PdfEmailPreview = ({ asset, pdfUrl, emailRef }) => (
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const App = () => {
+  const [assetId, setAssetId]       = useState(INITIAL_ASSET_ID);
+  const [assetList, setAssetList]   = useState([]);
   const [asset, setAsset]           = useState(null);
   const [error, setError]           = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -204,31 +220,62 @@ const App = () => {
   const [selectedZone, setSelectedZone] = useState(null);
   const emailRef = useRef(null);
 
+  // Fetch the asset directory once on mount — drives the switcher.
+  useEffect(() => {
+    fetchAssetList().then(setAssetList).catch(() => setAssetList([]));
+  }, []);
+
+  // Fetch the precheck whenever assetId changes.
   useEffect(() => {
     let cancelled = false;
-    setBackendStatus('connecting…');
-    fetchPrecheck(ASSET_ID)
+    setAsset(null);
+    setError(null);
+    setHoveredZone(null);
+    setSelectedZone(null);
+    renderBannerStatus('connecting…');
+    fetchPrecheck(assetId)
       .then(raw => {
         if (cancelled) return;
         const adapted = window.adaptBackendAsset(raw);
         setAsset(adapted);
-        setBackendStatus(
-          `<span class="ok">●</span> ${BACKEND} · asset <code>${ASSET_ID}</code> · ` +
+        renderBannerStatus(
+          `<span class="ok">●</span> ${BACKEND} · ` +
           `${raw.zones.length} zones · verdict ${raw.verdict} · score ${raw.scores.overall} · ` +
           `library n=${raw.library.sample_size}`,
           'ok',
         );
+        // Reflect current asset in the URL so the page is shareable.
+        const url = new URL(window.location);
+        url.searchParams.set('asset', assetId);
+        window.history.replaceState({}, '', url);
       })
       .catch(e => {
         if (cancelled) return;
         setError(e);
-        setBackendStatus(
+        renderBannerStatus(
           `<span class="err">●</span> ${BACKEND} unreachable: ${e.message}`,
           'err',
         );
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [assetId]);
+
+  // Mount the asset <select> into the static banner div outside the React tree.
+  useEffect(() => {
+    const banner = document.getElementById('backend-banner');
+    let pickerEl = document.getElementById('asset-picker');
+    if (!pickerEl) {
+      pickerEl = document.createElement('select');
+      pickerEl.id = 'asset-picker';
+      pickerEl.title = 'Switch asset';
+      pickerEl.style.marginLeft = 'auto';
+      banner.appendChild(pickerEl);
+    }
+    pickerEl.innerHTML = assetList
+      .map(a => `<option value="${a.asset_id}" ${a.asset_id === assetId ? 'selected' : ''}>${a.label}</option>`)
+      .join('');
+    pickerEl.onchange = (e) => setAssetId(e.target.value);
+  }, [assetList, assetId]);
 
   // ── loading + error states ───────────────────────────────────────────────
   if (error) {
@@ -267,7 +314,7 @@ const App = () => {
           borderTopColor:PALETTE.primary500,
           borderRadius:'50%', animation:'spin 0.8s linear infinite',
         }}/>
-        Loading precheck for {ASSET_ID}…
+        Loading precheck for {assetId}…
       </div>
     );
   }

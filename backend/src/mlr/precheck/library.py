@@ -77,25 +77,49 @@ _LIBRARY: tuple[ApprovedClaim, ...] = (
 )
 
 
+# The active library at runtime — defaults to the hardcoded `_LIBRARY`,
+# but `set_library()` can swap in a bootstrapped corpus (see
+# `mlr.ingest.library_bootstrap`). All lookup APIs read from `_active`,
+# never `_LIBRARY` directly.
+_active: tuple[ApprovedClaim, ...] = _LIBRARY
+
+
+def set_library(claims: list[ApprovedClaim] | tuple[ApprovedClaim, ...]) -> None:
+    """Replace the active library with the given claims."""
+    global _active
+    _active = tuple(claims)
+
+
+def reset_library() -> None:
+    """Restore the hardcoded default — used by tests."""
+    global _active
+    _active = _LIBRARY
+
+
+def all_claims() -> tuple[ApprovedClaim, ...]:
+    """Read-only view of the active library — for debug / coverage routes."""
+    return _active
+
+
 def find_candidates(brand: str, market: str, subtype: str | None) -> list[ApprovedClaim]:
     """
     Return all approved canonical variants for a (brand, market, subtype) slice.
 
-    `subtype` may be None on poorly-classified modules; in that case the
-    function returns no candidates — the engine's caller decides whether
-    to skip the claim or emit a "no canonical candidate" finding.
+    Subtype `None` falls back to "match any subtype" so coarsely-
+    classified modules still get checked against the brand/market
+    corpus. UNKNOWN-subtype canonicals also pass through.
     """
-    if subtype is None:
-        return []
     return [
-        c for c in _LIBRARY
-        if c.brand == brand and c.market == market and c.subtype == subtype
+        c for c in _active
+        if c.brand == brand
+        and c.market == market
+        and (subtype is None or c.subtype == subtype or c.subtype == "UNKNOWN")
     ]
 
 
 def lookup_pattern(pattern_id: str) -> ApprovedClaim | None:
     """Return the FIRST variant of a pattern (used by `GET /api/precheck/patterns/{id}`)."""
-    for c in _LIBRARY:
+    for c in _active:
         if c.pattern_id == pattern_id:
             return c
     return None
@@ -103,7 +127,7 @@ def lookup_pattern(pattern_id: str) -> ApprovedClaim | None:
 
 def total_size() -> int:
     """Surfaces in `Asset.library.sample_size`."""
-    return len(_LIBRARY)
+    return len(_active)
 
 
 def coverage_warning_for_size(size: int, threshold: int = 20) -> str | None:

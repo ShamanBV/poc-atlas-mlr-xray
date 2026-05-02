@@ -1,20 +1,26 @@
 """
 In-memory store of extracted assets, keyed by asset_id.
 
-Stands in for the real Atlas extractor pipeline_v5 output until the
-backend is plumbed to live extraction. Each fixture is shaped like what
-the extractor would emit — `ExtractedAsset` with blocks, supportive
-resources, envelope items.
+Two flavours of fixture live here:
 
-The KISQALI fixture is the asset the §6 sample payload in
-`MLR_PRECHECK_API.md` is built against, minus the precheck verdicts
-themselves (those are computed at request time by the engine).
+  1. **Synthetic** — handcrafted ExtractedAsset objects, used for
+     contract demonstrations and matching the §6 sample payload in
+     `MLR_PRECHECK_API.md`. Useful when you need a specific failure
+     mode (e.g. envelope.audience_restriction missing) reliably.
+
+  2. **Real** — loaded via the extractor adapter from the
+     extractor-service's `eval_atlas_*` extraction.json outputs.
+     These exercise the engine against actual UK email content.
+
+Both populate `_STORE`; `get(asset_id)` returns whichever was registered.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
+from mlr.ingest.extractor_adapter import adapt_file
 from mlr.precheck.schema import (
     AssetMeta,
     ExtractedAsset,
@@ -23,6 +29,30 @@ from mlr.precheck.schema import (
     ExtractedModule,
     SupportiveResource,
 )
+
+
+# Where the extractor service drops its eval outputs. Hardcoded for
+# the POC — production swaps this for an Atlas API call or a
+# library-store path once the Vault → Atlas ingest flow is live.
+_EXTRACTOR_OUTPUTS = Path(
+    "/Users/mauricevanleeuwen/Development/dev_projects/extractor-service/"
+    "test_sets/eval_atlas_20260430T172755Z"
+)
+_PDF_DIR = Path(
+    "/Users/mauricevanleeuwen/Development/dev_projects/extractor-service/"
+    "test_sets/emails"
+)
+
+
+def _real(stem: str, asset_id: str) -> ExtractedAsset:
+    """Load one extractor JSON + matching PDF into an ExtractedAsset."""
+    json_path = _EXTRACTOR_OUTPUTS / f"{stem}.extraction.json"
+    pdf_path = _PDF_DIR / f"{stem}.pdf"
+    return adapt_file(
+        json_path,
+        asset_id=asset_id,
+        pdf_path=str(pdf_path) if pdf_path.is_file() else None,
+    )
 
 
 # ─── KISQALI UK demo asset ────────────────────────────────────────────
@@ -168,8 +198,34 @@ KISQALI_UK_001 = ExtractedAsset(
 )
 
 
+# ─── real assets (loaded via extractor adapter) ──────────────────────
+
+
+def _load_real_assets() -> dict[str, ExtractedAsset]:
+    """
+    Load real-data fixtures lazily — if the extractor outputs aren't
+    present (e.g. running on CI / a fresh checkout), gracefully skip.
+    """
+    real: dict[str, ExtractedAsset] = {}
+    candidates = [
+        ("UK - Cosentyx - 2025 - Rheum - MDA SFMC", "real:cosentyx-uk-rheum-mda-001"),
+        ("UK - Scemblix - 2024 - HMY106 Automated Promotional Campaign Email 2", "real:scemblix-uk-hmy106-002"),
+        ("UK - Kesimpta 2025 - Aim for NEDA KTE", "real:kesimpta-uk-neda-001"),
+    ]
+    for stem, asset_id in candidates:
+        json_path = _EXTRACTOR_OUTPUTS / f"{stem}.extraction.json"
+        if not json_path.is_file():
+            continue
+        try:
+            real[asset_id] = _real(stem, asset_id)
+        except Exception as e:  # noqa: BLE001 — best-effort load; one bad JSON shouldn't kill the others
+            print(f"[fixtures] failed to load {stem}: {e}")
+    return real
+
+
 _STORE: dict[str, ExtractedAsset] = {
     KISQALI_UK_001.asset_id: KISQALI_UK_001,
+    **_load_real_assets(),
 }
 
 
@@ -179,3 +235,8 @@ def get(asset_id: str) -> Optional[ExtractedAsset]:
 
 def all_ids() -> list[str]:
     return sorted(_STORE.keys())
+
+
+def all_assets() -> list[ExtractedAsset]:
+    """Read-only list — used by the asset-switcher route."""
+    return [_STORE[k] for k in sorted(_STORE.keys())]
