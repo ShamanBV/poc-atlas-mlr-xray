@@ -48,8 +48,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sa
 .mlr-avatar{width:28px;height:28px;border-radius:50%;background:#6F7E7F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.3px;flex-shrink:0;cursor:pointer;border:2px solid #E5F6EE;box-shadow:0 0 0 1px #BDBDBD;transition:transform .12s;}
 .mlr-avatar:hover{transform:translateY(-1px);}
 .mlr-avatar.alt{background:#00A66F;}
-.mlr-libbtn{font-size:13px;font-weight:500;color:#323232;background:#fff;border:1px solid #BDBDBD;border-radius:6px;padding:5px 14px;cursor:pointer;transition:all .14s;font-family:inherit;margin-left:12px;margin-right:14px;}
-.mlr-libbtn:hover{background:#E5F6EE;border-color:#00A66F;color:#00A66F;}
+.mlr-libbtn{font-size:13px;font-weight:500;color:#323232;background:#fff;border:1px solid #BDBDBD;border-radius:6px;padding:5px 14px;cursor:pointer;transition:all .14s;font-family:inherit;margin-left:12px;margin-right:14px;display:inline-flex;align-items:center;gap:6px;}
+.mlr-libbtn:hover,.mlr-libbtn.open{background:#E5F6EE;border-color:#00A66F;color:#00A66F;}
+.mlr-libbtn .caret{font-size:9px;transition:transform .12s;}
+.mlr-libbtn.open .caret{transform:rotate(180deg);}
+
+/* Library popover — anchored to the Library button on the header */
+.lib-pop{position:absolute;top:54px;right:14px;z-index:200;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.14);min-width:340px;max-width:480px;max-height:60vh;overflow:hidden;display:flex;flex-direction:column;animation:libPopIn .14s ease-out;}
+@keyframes libPopIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.lib-pop-hdr{padding:10px 14px 6px;border-bottom:1px solid #f3f4f6;font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:6px;}
+.lib-pop-list{overflow-y:auto;}
+.lib-pop-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid #f7f7f7;transition:background .1s;}
+.lib-pop-row:hover{background:#f9fafb;}
+.lib-pop-row.active{background:#E5F6EE;}
+.lib-pop-row .badge{flex-shrink:0;width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:#6F7E7F;}
+.lib-pop-row.active .badge{background:#00A66F;}
+.lib-pop-row .label{flex:1;display:flex;flex-direction:column;min-width:0;}
+.lib-pop-row .brand{font-size:13px;font-weight:600;color:#323232;}
+.lib-pop-row .meta{font-size:10px;color:#6F7E7F;text-transform:uppercase;letter-spacing:.4px;}
+.lib-pop-row .check{flex-shrink:0;font-size:14px;color:#00A66F;width:16px;text-align:right;}
 
 /* ── TOOLBAR ───────────────────────────── */
 .toolbar{height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
@@ -1343,6 +1360,18 @@ function App(){
     : assetId;
   const headerDocType = (meta?.doc_type || 'document').toUpperCase().replace('_', ' ');
 
+  // Library popover state — opens from the header's Library button.
+  const [libOpen, setLibOpen] = useState(false);
+  const libRef = useRef(null);
+  useEffect(() => {
+    if (!libOpen) return;
+    const onDoc = e => {
+      if (libRef.current && !libRef.current.contains(e.target)) setLibOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [libOpen]);
+
   return (
     <>
       {/* ── SHAMAN MLR HEADER (apryse-designer style) ─────────────── */}
@@ -1372,22 +1401,44 @@ function App(){
           <span className="mlr-avatar"     title="Frances Smith">FS</span>
           <span className="mlr-avatar alt" title="Maurice van Leeuwen" style={{marginLeft:-6}}>ML</span>
         </div>
-        <button className="mlr-libbtn" onClick={()=>toast('Library — coming soon','i')}>Library</button>
+        <div ref={libRef} style={{position:'relative'}}>
+          <button className={`mlr-libbtn${libOpen ? ' open' : ''}`}
+            onClick={()=>setLibOpen(v => !v)}>
+            Library
+            <span className="caret">▼</span>
+          </button>
+          {libOpen && (
+            <div className="lib-pop">
+              <div className="lib-pop-hdr">
+                <span>Library · {assetList.length} asset{assetList.length === 1 ? '' : 's'}</span>
+              </div>
+              <div className="lib-pop-list">
+                {assetList.length === 0 && (
+                  <div style={{padding:'14px',fontSize:12,color:'#9ca3af',textAlign:'center'}}>
+                    No assets available.
+                  </div>
+                )}
+                {assetList.map(a => (
+                  <div key={a.asset_id}
+                    className={`lib-pop-row${a.asset_id === assetId ? ' active' : ''}`}
+                    onClick={() => { setAssetId(a.asset_id); setLibOpen(false); }}>
+                    <span className="badge">{(a.brand || '?').slice(0,2).toUpperCase()}</span>
+                    <span className="label">
+                      <span className="brand">{a.brand || a.asset_id}</span>
+                      <span className="meta">{a.market || '—'} · {a.doc_type || '—'}{a.code ? ' · ' + a.code : ''}</span>
+                    </span>
+                    {a.asset_id === assetId && <span className="check">✓</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── TOOLBAR ──────────────────────────────── */}
+      {/* Asset name + switcher moved to the header's Library popover. */}
       <div className="toolbar">
-        <span style={{fontSize:12,fontWeight:500,color:'#111827',whiteSpace:'nowrap'}}>
-          {assetId}
-        </span>
-        {/* Asset switcher — populated by /api/assets */}
-        <select value={assetId} onChange={e=>setAssetId(e.target.value)}
-          style={{marginLeft:6,fontSize:11,padding:'2px 6px',border:'1px solid #e5e7eb',
-                  borderRadius:4,background:'#fff',cursor:'pointer',fontFamily:'inherit'}}>
-          {assetList.map(a => (
-            <option key={a.asset_id} value={a.asset_id}>{a.label}</option>
-          ))}
-        </select>
         <div style={{display:'flex',alignItems:'center',gap:8,background:'#fff',border:'1px solid #e5e7eb',borderRadius:5,padding:'2px 9px'}}>
           <span style={{fontSize:11,fontWeight:600,color:P600}}>{totalCount-acceptedCount} remaining</span>
           <span style={{color:'#e5e7eb',fontSize:10}}>·</span>
