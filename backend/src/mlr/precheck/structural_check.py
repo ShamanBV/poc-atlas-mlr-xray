@@ -35,7 +35,7 @@ role (because the block isn't present in the asset). No overlap.
 
 from __future__ import annotations
 
-from .schema import ExtractedAsset, ExtractedBlock
+from .schema import ExtractedAsset, ExtractedBlock, ExtractedVisual
 from .verdict import Verdict
 
 
@@ -78,6 +78,25 @@ _HANDLED_BY_OTHER_LAYERS = frozenset({
 })
 
 
+# Visual `kind` → (label, lane). Visuals are emitted in addition to
+# block-based structural zones. Lane is Medical by default — visuals
+# usually support claims; brand/legal-marked assets (logos, IP marks)
+# go to Legal.
+_VISUAL_KIND_LABEL_LANE: dict[str, tuple[str, str]] = {
+    "banner":     ("Brand banner",     "L"),
+    "logo":       ("Brand logo",       "L"),
+    "brand-mark": ("Brand mark",       "L"),
+    "photo":      ("Photography",      "M"),
+    "hero":       ("Hero image",       "M"),
+    "patient":    ("Patient image",    "M"),
+    "chart":      ("Chart / data viz", "M"),
+    "diagram":    ("Diagram",          "M"),
+    "icon":       ("Icons",            "M"),
+    "infographic":("Infographic",      "M"),
+}
+_VISUAL_FALLBACK_LABEL_LANE: tuple[str, str] = ("Visual", "M")
+
+
 # Doc-pos hint puts structural zones interleaved with claims — earlier
 # than Layer 2 (200+) and Layer 3 (900+). Header / preamble pieces sit
 # at the top, footer-ish pieces near the bottom.
@@ -103,6 +122,21 @@ _DOC_POS_BY_ROLE: dict[str, float] = {
     "PRIVACY":                85.0,  # via BODY subtype
 }
 
+# Visual kind → doc-pos hint. Brand-related visuals at the top,
+# data/icon visuals interleaved with claims.
+_DOC_POS_BY_VISUAL_KIND: dict[str, float] = {
+    "logo":       1.5,
+    "brand-mark": 1.6,
+    "banner":     1.7,
+    "hero":       2.5,
+    "photo":     10.0,
+    "patient":   10.5,
+    "chart":     15.0,
+    "diagram":   15.5,
+    "infographic":16.0,
+    "icon":      18.0,
+}
+
 
 def _label_for_block(blk: ExtractedBlock) -> tuple[str, str] | None:
     """Returns (label, lane) for the block, or None if it shouldn't be surfaced."""
@@ -123,9 +157,11 @@ def _doc_pos(role: str, subtype: str | None, occurrence_index: int) -> float:
 
 
 def run(asset: ExtractedAsset) -> list[Verdict]:
-    """Walk extracted blocks, emit one verdict per recognised structural role."""
-    # Group blocks by their effective key (role or subtype for BODY) for
-    # dedupe + count.
+    """
+    Walk extracted blocks AND visuals, emit one verdict per recognised
+    structural role / visual kind.
+    """
+    # ── blocks pass ──────────────────────────────────────────────
     seen: dict[str, list[ExtractedBlock]] = {}
     for blk in asset.blocks:
         ll = _label_for_block(blk)
@@ -138,7 +174,7 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
     for idx, (key, blocks) in enumerate(seen.items()):
         first = blocks[0]
         ll = _label_for_block(first)
-        assert ll is not None  # we filtered above
+        assert ll is not None
         label, lane = ll
         count = len(blocks)
         label_with_count = label if count == 1 else f"{label} ({count})"
@@ -147,7 +183,7 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
             text_excerpt = text_excerpt[:199].rstrip() + "…"
         verdicts.append(
             Verdict(
-                layer="cascade",  # Zone.layer enum: closest fit for "structural"
+                layer="cascade",
                 sub_layer=f"structural:{key.lower()}",
                 label=label_with_count,
                 status="clean",
@@ -165,4 +201,43 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
                 doc_pos_hint=_doc_pos(first.role, first.subtype, idx),
             )
         )
+
+    # ── visuals pass ─────────────────────────────────────────────
+    # Group by `kind`; one zone per kind. Visuals without a kind fall
+    # under the generic "Visual" label.
+    visuals_by_kind: dict[str, list[ExtractedVisual]] = {}
+    for v in asset.visuals:
+        key = (v.kind or "_unknown").lower()
+        visuals_by_kind.setdefault(key, []).append(v)
+
+    for v_idx, (kind_key, vs) in enumerate(visuals_by_kind.items()):
+        first = vs[0]
+        label, lane = _VISUAL_KIND_LABEL_LANE.get(kind_key, _VISUAL_FALLBACK_LABEL_LANE)
+        count = len(vs)
+        label_with_count = label if count == 1 else f"{label} ({count})"
+        # Use the visual's description as the excerpt; fall back to its kind.
+        excerpt = (first.description or "").strip() or (first.kind or "Visual")
+        if len(excerpt) > 200:
+            excerpt = excerpt[:199].rstrip() + "…"
+        verdicts.append(
+            Verdict(
+                layer="cascade",
+                sub_layer=f"visual:{kind_key}",
+                label=label_with_count,
+                status="clean",
+                severity="info",
+                lanes=[lane],  # type: ignore[list-item]
+                evidence="Extracted",
+                evidence_detail=(
+                    f"Visual of kind '{kind_key}' present in this asset "
+                    f"({count} occurrence{'s' if count != 1 else ''}). "
+                    "Not yet verified against an approved canonical."
+                ),
+                extracted_content=excerpt,
+                bbox=first.bbox,
+                page=first.page,
+                doc_pos_hint=_DOC_POS_BY_VISUAL_KIND.get(kind_key, 12.0) + v_idx * 0.001,
+            )
+        )
+
     return verdicts
