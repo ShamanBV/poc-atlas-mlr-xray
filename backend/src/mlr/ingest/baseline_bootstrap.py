@@ -174,6 +174,45 @@ def curated_path() -> Path:
     return _DEFAULT_CURATED_PATH
 
 
+# ─── writer (JSONL persistence — POC + extractor-service handoff) ────
+
+
+def exemplar_to_dict(ex: BaselineExemplar) -> dict:
+    """The canonical on-disk shape for one exemplar. Stable contract."""
+    return {
+        "role":          ex.role,
+        "text":          ex.text,
+        "n":             ex.n,
+        "coverage":      round(ex.coverage, 4),
+        "window_months": ex.window_months,
+        "first_seen":    ex.first_seen,
+        "source_id":     ex.source_id,
+        "pattern_id":    ex.pattern_id,
+    }
+
+
+def write_jsonl(path: Path, exemplars: list[BaselineExemplar]) -> int:
+    """
+    Write the given exemplars to `path` as JSON Lines. Creates parent
+    directories. One line per exemplar; a leading `# …` comment block
+    documents the schema for human readers. Returns the count written.
+
+    Round-trip safe: load_curated_file(write_jsonl(...)) returns an
+    equivalent list.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        f.write("# UK email baseline exemplars — one JSON object per line.\n")
+        f.write("# Schema: role, text, n, coverage, window_months, first_seen,\n")
+        f.write("#         source_id, pattern_id (see baseline_bootstrap.py docstring).\n")
+        f.write("# Loader: mlr.ingest.baseline_bootstrap.load_curated_file()\n")
+        f.write("# Resolution: MLR_BASELINE_PATH env var > backend/baselines/uk_email_baselines.jsonl\n")
+        for ex in exemplars:
+            f.write(json.dumps(exemplar_to_dict(ex), ensure_ascii=False))
+            f.write("\n")
+    return len(exemplars)
+
+
 def load_default_baseline(extractions_dir: Path | None = None) -> list[BaselineExemplar]:
     """
     Resolution order:
