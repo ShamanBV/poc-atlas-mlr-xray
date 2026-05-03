@@ -1,6 +1,184 @@
 // XRayDrawer.jsx — Right-pane X-ray spine with tabs, inline expand, annotation composer
 
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// Backend base URL (mirrors index.html constant). Falls back to
+// localhost:8088 if the global isn't set.
+const _BACKEND = (typeof window !== 'undefined' && window.BACKEND) || 'http://localhost:8088';
+
+// Glyph per visual_kind, used by the Visual Library card. Material
+// Icons names — already loaded for the rest of the prototype.
+const _VISUAL_KIND_ICON = {
+  banner:      'view_carousel',
+  logo:        'verified',
+  photo:       'photo_camera',
+  hero:        'photo',
+  patient:     'person',
+  chart:       'bar_chart',
+  diagram:     'schema',
+  icon:        'apps',
+  infographic: 'data_object',
+  table:       'table_chart',
+  other:       'image',
+  unknown:     'help_outline',
+};
+
+// ─── VISUAL LIBRARY CARD ─────────────────────────────────────────────────────
+// Collapsible panel listing the visual exemplars in the active UK
+// baseline corpus (banks/logos/photos/icons/...). Source for the MLR
+// reviewer to repurpose approved visuals into new assets. Driven by
+// GET /api/baseline/visuals.
+const VisualLibraryCard = () => {
+  const [open, setOpen] = useState(false);  // collapsed by default
+  const [filter, setFilter] = useState('');  // visual_kind filter
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open || data || error) return;
+    fetch(`${_BACKEND}/api/baseline/visuals?limit=500`)
+      .then(r => r.json())
+      .then(setData)
+      .catch(setError);
+  }, [open, data, error]);
+
+  // Build the kind filter chip list from the loaded data.
+  const kinds = useMemo(() => {
+    if (!data?.visuals) return [];
+    const counts = new Map();
+    for (const v of data.visuals) {
+      const k = (v.visual_kind || 'unknown');
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [data]);
+
+  const visible = useMemo(() => {
+    if (!data?.visuals) return [];
+    if (!filter) return data.visuals;
+    return data.visuals.filter(v => (v.visual_kind || 'unknown') === filter);
+  }, [data, filter]);
+
+  return (
+    <div style={{ margin:'0 12px 6px', border:`1.5px solid ${C.grey50}`,
+      borderRadius:8, background:C.white, overflow:'hidden', flexShrink:0 }}>
+      <div onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex', alignItems:'center', gap:7, padding:'7px 11px',
+        background:C.grey25, borderBottom: open ? `1px solid ${C.grey50}` : 'none',
+        cursor:'pointer', userSelect:'none',
+      }}>
+        <span style={{ fontSize:10, color:C.grey400,
+          display:'inline-block', transition:'transform .15s',
+          transform: open ? 'rotate(90deg)' : 'none' }}>▶</span>
+        <span style={{ fontSize:9, fontWeight:700, color:C.grey700,
+          textTransform:'uppercase', letterSpacing:.6 }}>Visual library</span>
+        <span style={{ fontSize:11, color:C.grey500, marginLeft:2 }}>
+          {data ? `${data.total} approved visuals` : 'click to load'}
+        </span>
+        <span style={{ marginLeft:'auto', fontSize:9, color:C.grey400,
+          fontStyle:'italic' }}>repurpose source</span>
+      </div>
+
+      {open && (
+        <div style={{ background:C.white, maxHeight:360, overflowY:'auto' }}>
+          {error && (
+            <div style={{ padding:14, fontSize:12, color:C.miss }}>
+              Couldn't load visuals: {error.message || 'fetch failed'}
+            </div>
+          )}
+          {!data && !error && (
+            <div style={{ padding:14, fontSize:12, color:C.grey400, textAlign:'center' }}>
+              Loading visual library…
+            </div>
+          )}
+          {data && (
+            <>
+              {/* Kind filter chips */}
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4,
+                padding:'7px 11px', borderBottom:`1px solid ${C.grey50}`,
+                background:C.grey25 }}>
+                <span onClick={()=>setFilter('')} style={{
+                  fontSize:10, fontWeight:600, padding:'2px 7px', borderRadius:10,
+                  cursor:'pointer',
+                  background: filter==='' ? C.green600 : C.white,
+                  color: filter==='' ? C.white : C.grey700,
+                  border:`1px solid ${filter==='' ? C.green600 : C.grey100}`,
+                }}>All {data.total}</span>
+                {kinds.map(([k, n]) => (
+                  <span key={k} onClick={()=>setFilter(k)} style={{
+                    fontSize:10, fontWeight:600, padding:'2px 7px', borderRadius:10,
+                    cursor:'pointer',
+                    background: filter===k ? C.green600 : C.white,
+                    color: filter===k ? C.white : C.grey700,
+                    border:`1px solid ${filter===k ? C.green600 : C.grey100}`,
+                  }}>{k} · {n}</span>
+                ))}
+              </div>
+              {/* Visual rows */}
+              {visible.length === 0 && (
+                <div style={{ padding:14, fontSize:12, color:C.grey400, textAlign:'center' }}>
+                  No visuals match the current filter.
+                </div>
+              )}
+              {visible.map(v => {
+                const icon = _VISUAL_KIND_ICON[(v.visual_kind || 'unknown')] || 'image';
+                const desc = (v.description || v.ocr_text || v.image_url || 'no description').trim();
+                return (
+                  <div key={v.pattern_id} style={{
+                    display:'flex', alignItems:'flex-start', gap:9, padding:'8px 11px',
+                    borderBottom:`1px solid ${C.grey50}`,
+                  }}>
+                    {/* Thumb placeholder using kind icon */}
+                    <div style={{
+                      flexShrink:0, width:38, height:38, borderRadius:5,
+                      background: C.green25, border:`1px solid ${C.green100}`,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      color: C.green600,
+                    }}>
+                      <span className="material-icons" style={{ fontSize:20 }}>{icon}</span>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{
+                        display:'flex', alignItems:'center', gap:6,
+                        fontSize:9, fontWeight:700, textTransform:'uppercase',
+                        letterSpacing:.4, color:C.grey700, marginBottom:3,
+                      }}>
+                        <span>{(v.visual_kind || 'unknown').toUpperCase()}</span>
+                        {v.n > 1 && (
+                          <span style={{ fontWeight:500, color:C.grey400 }}>
+                            · seen {v.n}×
+                          </span>
+                        )}
+                        {v.image_url && (
+                          <a href={v.image_url} target="_blank" rel="noopener noreferrer"
+                            onClick={e=>e.stopPropagation()}
+                            style={{ marginLeft:'auto', color:C.grey400, fontSize:11 }}>
+                            <span className="material-icons" style={{ fontSize:13 }}>open_in_new</span>
+                          </a>
+                        )}
+                      </div>
+                      <div style={{ fontSize:12, color:C.grey900, lineHeight:1.35,
+                        display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical',
+                        overflow:'hidden', textOverflow:'ellipsis' }}>
+                        {desc}
+                      </div>
+                      {v.ocr_text && (
+                        <div style={{ fontSize:10, color:C.grey400, marginTop:3,
+                          fontStyle:'italic' }}>
+                          OCR: {v.ocr_text}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── ASSET META CARD ─────────────────────────────────────────────────────────
 // Collapsible card showing brand/market/lang/refs/footnotes/doc-type/approval.
@@ -558,6 +736,7 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
       {/* X-ray spine */}
       <div style={{ flex:1,overflowY:'auto',background:C.grey25 }}>
         <AssetMetaCard asset={asset}/>
+        <VisualLibraryCard/>
         <div style={{ background:C.white,borderBottom:`1px solid ${C.grey50}`,borderTop:`1px solid ${C.grey50}` }}>
           {filteredZones.length === 0 ? (
             <div style={{ padding:'20px 14px',fontSize:12,color:C.grey400,textAlign:'center' }}>

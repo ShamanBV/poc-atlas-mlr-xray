@@ -289,6 +289,50 @@ def get_preview_pdf(asset_id: str):
     )
 
 
+@app.get("/api/baseline/visuals")
+def list_baseline_visuals(kind: str | None = None, limit: int = 200) -> dict:
+    """
+    Visual exemplars from the active UK baseline corpus — surfaced in
+    the drawer's Visual Library panel for repurpose lookup.
+
+    Query params:
+      kind=banner|logo|photo|icon|chart|diagram|infographic|table|other
+        — filter by visual_kind (case-insensitive, optional).
+      limit=N (default 200) — cap the list size.
+
+    The MLR X-Ray match logic doesn't consume these (D29 stays text-
+    only); they live in the same baseline corpus for downstream
+    "repurpose" use per user direction.
+    """
+    out: list[dict] = []
+    wanted_kind = (kind or "").lower() or None
+    for ex in baseline.all_exemplars():
+        if ex.kind != "visual":
+            continue
+        if wanted_kind and (ex.visual_kind or "").lower() != wanted_kind:
+            continue
+        out.append({
+            "role": ex.role,
+            "visual_kind": ex.visual_kind,
+            "description": ex.text,
+            "image_url": ex.image_url,
+            "ocr_text": ex.ocr_text,
+            "classification": ex.classification,
+            "n": ex.n,
+            "coverage": ex.coverage,
+            "source_id": ex.source_id,
+            "pattern_id": ex.pattern_id,
+            "page": ex.page,
+            "bbox": ex.bbox,
+        })
+    out.sort(key=lambda x: (x["visual_kind"] or "_unknown", -x["n"]))
+    return {
+        "total": len(out),
+        "limit": limit,
+        "visuals": out[:limit],
+    }
+
+
 @app.get("/api/health")
 def health() -> dict:
     """Liveness probe."""
