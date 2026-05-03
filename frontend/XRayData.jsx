@@ -228,4 +228,41 @@ const laneToken   = l => l==='M'?C.laneM:l==='L'?C.laneL:C.laneR;
 const scoreVerdict= s => s>=90?'Pass':s>=75?'Warn':'Fail';
 const scoreColor  = s => s>=90?C.clean:s>=75?C.attn:C.miss;
 
-Object.assign(window, { C, ASSETS, statusColor, statusBg, laneToken, scoreVerdict, scoreColor });
+// ─── Health helpers (replace the punitive 0–100 score) ───────────────
+// healthPct: % of zones cleared (clean / annotated / info-severity).
+//   Goes UP as the reviewer works through the list. Excludes dismissed.
+// Tiers by SEVERITY, not just status — a miss with severity=info
+// (e.g. structural "Novel" reference rows) is informational noise, not
+// a blocker. Only severity=block becomes a blocker.
+// healthVerb / healthColor: 3-tier status; precedence blockers > attention > clean.
+// `zoneActions` is the per-asset map from XRayDrawer ({zoneId: 'annotated'|'dismissed'}).
+const healthCounts = (zones, zoneActions = {}) => {
+  const live = zones.filter(z => zoneActions[z.id] !== 'dismissed');
+  const total = live.length;
+  // Annotated/clean/info-severity zones don't need user action.
+  // (Pattern-matched at high similarity but with miss STATUS is still an
+  //  info-severity row — workflow neutral, surfaces as cleared.)
+  const blockers  = live.filter(z =>
+    z.severity === 'block' && z.status !== 'clean' && zoneActions[z.id] !== 'annotated'
+  ).length;
+  const attention = live.filter(z =>
+    z.severity === 'warn' && z.status !== 'clean' && zoneActions[z.id] !== 'annotated'
+  ).length;
+  // Cleared = the rest (anything not in the two action-required buckets).
+  const cleared = total - blockers - attention;
+  const pct = total === 0 ? 100 : Math.round(100 * cleared / total);
+  return { total, cleared, attention, blockers, pct };
+};
+const healthVerb = ({ blockers, attention }) =>
+  blockers > 0  ? 'Needs revision'
+: attention > 0 ? 'Review pending'
+:                 'Ready to approve';
+const healthColor = ({ blockers, attention }) =>
+  blockers > 0  ? C.miss
+: attention > 0 ? C.attn
+:                 C.clean;
+
+Object.assign(window, {
+  C, ASSETS, statusColor, statusBg, laneToken, scoreVerdict, scoreColor,
+  healthCounts, healthVerb, healthColor,
+});

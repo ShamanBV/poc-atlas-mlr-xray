@@ -558,31 +558,32 @@ const TabBar = ({ active, onSelect, asset }) => {
 };
 
 // ─── CHECK SUMMARY BAR ────────────────────────────────────────────────────────
+// Severity-tiered counts for the active tab, mirroring the HEALTH header:
+// blockers (severity=block) and attention (severity=warn) are the only
+// rows that need user action; everything else (clean / annotated /
+// info-severity) folds into "cleared".
 const CheckSummary = ({ zones, activeTab, asset, zoneActions }) => {
   const allFiltered = activeTab==='all' ? zones : zones.filter(z=>z.lanes.includes(activeTab));
-  // Exclude dismissed from counts — workload = what's still open
-  const filtered = allFiltered.filter(z=>zoneActions[z.id]!=='dismissed');
-  const total   = filtered.length;
-  const clean   = filtered.filter(z=>z.status==='clean'||zoneActions[z.id]==='annotated').length;
-  const attn    = filtered.filter(z=>z.status==='attn'&&!zoneActions[z.id]).length;
-  const miss    = filtered.filter(z=>z.status==='miss'&&!zoneActions[z.id]).length;
   const dismissed = allFiltered.filter(z=>zoneActions[z.id]==='dismissed').length;
+  const h = healthCounts(allFiltered, zoneActions);
 
-  const scoreKey = activeTab==='all'?'overall':activeTab==='M'?'medical':activeTab==='L'?'legal':'regulatory';
-  const score = asset.scores[scoreKey];
-  const scol  = scoreColor(score);
   const laneLabel = activeTab==='all'?'total checks'
     : laneToken(activeTab).label.toLowerCase()+' checks';
+  const headlineColor = h.total === 0 ? C.grey400
+                      : h.blockers > 0 ? C.miss
+                      : h.attention > 0 ? C.attn : C.clean;
 
   return (
     <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',
       padding:'7px 14px',background:C.white,borderBottom:`1px solid ${C.grey50}`,flexWrap:'wrap',gap:8 }}>
       <div style={{ display:'flex',gap:10,alignItems:'center',flexWrap:'wrap' }}>
-        <span style={{ fontSize:12,color:C.grey600 }}><strong style={{ color:C.grey900 }}>{total}</strong> {laneLabel}</span>
+        <span style={{ fontSize:12,color:C.grey600 }}>
+          <strong style={{ color:C.grey900 }}>{h.total}</strong> {laneLabel}
+        </span>
         {[
-          {label:'clean',   count:clean, col:C.clean},
-          {label:'attention',count:attn, col:C.attn},
-          {label:'missing', count:miss,  col:C.miss},
+          {label: h.blockers === 1 ? 'blocker' : 'blockers', count:h.blockers, col:C.miss},
+          {label: 'attention',                               count:h.attention,col:C.attn},
+          {label: 'cleared',                                 count:h.cleared,  col:C.clean},
         ].map(({label,count,col})=>(
           <span key={label} style={{ display:'inline-flex',alignItems:'center',gap:4,fontSize:12,color:C.grey600 }}>
             <span style={{ width:7,height:7,borderRadius:'50%',background:col }}/>
@@ -593,8 +594,9 @@ const CheckSummary = ({ zones, activeTab, asset, zoneActions }) => {
           <span style={{ fontSize:11,color:C.grey300,fontStyle:'italic' }}>{dismissed} dismissed</span>
         )}
       </div>
-      <span style={{ fontSize:13,fontWeight:700,color:scol,fontVariantNumeric:'tabular-nums',flexShrink:0 }}>
-        {activeTab==='all'?'Overall':laneToken(activeTab)?.label} · {score}
+      <span style={{ fontSize:13,fontWeight:700,color:headlineColor,
+        fontVariantNumeric:'tabular-nums',flexShrink:0 }}>
+        {h.total === 0 ? 'No checks' : `${h.pct}% cleared`}
       </span>
     </div>
   );
@@ -734,14 +736,46 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
         padding:'11px 14px 10px',flexShrink:0 }}>
         <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8 }}>
           <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:10,fontWeight:700,color:C.grey400,
-              textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2 }}>Total score</div>
-            <div style={{ display:'flex',alignItems:'baseline',gap:6 }}>
-              <span style={{ fontSize:42,fontWeight:700,color:scoreColor(asset.scores.overall),
-                fontVariantNumeric:'tabular-nums',lineHeight:1 }}>{asset.scores.overall}</span>
-              <span style={{ fontSize:12,color:C.grey300,paddingBottom:2 }}>/100</span>
-            </div>
-            {/* Identity row removed — moved to the AssetMetaCard below the tabs. */}
+            {/* Health % replaces the punitive 0-100 score. Reads UP as the
+                reviewer works through the list. Verb + breakdown chips
+                below tell triage at a glance. */}
+            {(() => {
+              const h    = healthCounts(asset.zones, zoneActions);
+              const verb = healthVerb(h);
+              const verbCol = healthColor(h);
+              return (
+                <>
+                  <div style={{ fontSize:10,fontWeight:700,color:C.grey400,
+                    textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2 }}>Health</div>
+                  <div style={{ display:'flex',alignItems:'baseline',gap:4 }}>
+                    <span style={{ fontSize:42,fontWeight:700,color:verbCol,
+                      fontVariantNumeric:'tabular-nums',lineHeight:1 }}>{h.pct}</span>
+                    <span style={{ fontSize:14,color:C.grey300,paddingBottom:3 }}>%</span>
+                    <span style={{ fontSize:11,color:C.grey400,marginLeft:7,paddingBottom:3 }}>
+                      cleared
+                    </span>
+                  </div>
+                  <div style={{ display:'flex',alignItems:'center',gap:6,marginTop:7,flexWrap:'wrap' }}>
+                    <span style={{ fontSize:11,fontWeight:700,color:verbCol,
+                      textTransform:'uppercase',letterSpacing:'.06em' }}>{verb}</span>
+                    {h.blockers > 0 && (
+                      <span style={{ fontSize:11,color:C.miss,display:'inline-flex',
+                        alignItems:'center',gap:3 }}>
+                        <span style={{ width:6,height:6,borderRadius:'50%',background:C.miss }}/>
+                        {h.blockers} {h.blockers === 1 ? 'blocker' : 'blockers'}
+                      </span>
+                    )}
+                    {h.attention > 0 && (
+                      <span style={{ fontSize:11,color:C.attn,display:'inline-flex',
+                        alignItems:'center',gap:3 }}>
+                        <span style={{ width:6,height:6,borderRadius:'50%',background:C.attn }}/>
+                        {h.attention} attention
+                      </span>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div style={{ display:'flex',gap:6,alignItems:'center',flexShrink:0 }}>
             <button onClick={()=>setShowHistory(h=>!h)} title="Version history"
