@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from mlr.api_views.document_xray import to_document_xray
 from mlr.fixtures import assets as fixture_assets
 from mlr.ingest import library_bootstrap
-from mlr.precheck import abbreviation_check, claim_check, document_check, library
+from mlr.precheck import abbreviation_check, claim_check, document_check, library, structural_check
 from mlr.precheck.asset_builder import build_asset
 from mlr.precheck.dependency_rules import load_default_catalog
 from mlr.precheck.schema import Asset, ErrorBody, ErrorResponse
@@ -111,12 +111,13 @@ def get_precheck(asset_id: str, force: bool = False) -> Asset:  # noqa: ARG001 (
             },
         )
 
+    structural_verdicts = structural_check.run(extracted)
     claim_verdicts = claim_check.run(extracted)
     document_verdicts = document_check.run(extracted, _CATALOG)
     abbreviation_verdicts = abbreviation_check.run(extracted)
 
     # Future: cascade_adapter appends `layer:cascade` zones here.
-    verdicts = [*claim_verdicts, *document_verdicts, *abbreviation_verdicts]
+    verdicts = [*structural_verdicts, *claim_verdicts, *document_verdicts, *abbreviation_verdicts]
 
     return build_asset(
         extracted=extracted,
@@ -152,6 +153,7 @@ def get_document_xray(asset_id: str) -> dict:
         )
 
     verdicts = [
+        *structural_check.run(extracted),
         *claim_check.run(extracted),
         *document_check.run(extracted, _CATALOG),
         *abbreviation_check.run(extracted),
