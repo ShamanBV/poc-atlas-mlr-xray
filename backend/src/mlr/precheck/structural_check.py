@@ -158,47 +158,70 @@ def _doc_pos(role: str, subtype: str | None, occurrence_index: int) -> float:
 
 def run(asset: ExtractedAsset) -> list[Verdict]:
     """
-    Walk extracted blocks AND visuals, emit one verdict per recognised
-    structural role / visual kind.
+    Walk extracted blocks AND visuals, emit one verdict per BLOCK
+    (not per role). Each granular block — promotional_notice,
+    PI_link, adverse_events_reporting, another promotional_notice — is
+    a separate spine zone so the legal/MLR reviewer can validate each
+    individually.
+
+    For roles that appear N>1 times, labels are numbered "(2 of 2)" so
+    the spine remains scannable.
     """
     # ── blocks pass ──────────────────────────────────────────────
-    seen: dict[str, list[ExtractedBlock]] = {}
+    # First, count occurrences per role-key so we know whether to add
+    # "(K of N)" suffix in labels.
+    role_counts: dict[str, int] = {}
     for blk in asset.blocks:
         ll = _label_for_block(blk)
         if ll is None:
             continue
         key = blk.subtype if (blk.role == "BODY" and blk.subtype) else blk.role
-        seen.setdefault(key, []).append(blk)
+        role_counts[key] = role_counts.get(key, 0) + 1
 
+    role_seen_so_far: dict[str, int] = {}
     verdicts: list[Verdict] = []
-    for idx, (key, blocks) in enumerate(seen.items()):
-        first = blocks[0]
-        ll = _label_for_block(first)
-        assert ll is not None
+    for idx, blk in enumerate(asset.blocks):
+        ll = _label_for_block(blk)
+        if ll is None:
+            continue
+        key = blk.subtype if (blk.role == "BODY" and blk.subtype) else blk.role
         label, lane = ll
-        count = len(blocks)
-        label_with_count = label if count == 1 else f"{label} ({count})"
-        text_excerpt = (first.text or "").strip()
+        n_total = role_counts[key]
+        role_seen_so_far[key] = role_seen_so_far.get(key, 0) + 1
+        n_index = role_seen_so_far[key]
+        # Numbered suffix only when there's more than one of this role.
+        label_for_zone = label if n_total == 1 else f"{label} ({n_index} of {n_total})"
+
+        text_excerpt = (blk.text or "").strip()
         if len(text_excerpt) > 200:
             text_excerpt = text_excerpt[:199].rstrip() + "…"
+
+        # Stable, content-aware sub_layer so multi-occurrence rows have
+        # distinct ids that downstream layers can reference.
+        suffix = "" if n_total == 1 else f":{n_index}"
+        sub_layer = f"structural:{key.lower()}{suffix}"
+
         verdicts.append(
             Verdict(
                 layer="cascade",
-                sub_layer=f"structural:{key.lower()}",
-                label=label_with_count,
+                sub_layer=sub_layer,
+                label=label_for_zone,
                 status="clean",
                 severity="info",
                 lanes=[lane],  # type: ignore[list-item]
                 evidence="Extracted",
                 evidence_detail=(
-                    f"Block role {key} present in this asset "
-                    f"({count} occurrence{'s' if count != 1 else ''}). "
-                    "Not yet verified against an approved canonical."
+                    f"Block role {key} present in this asset"
+                    + (f" (occurrence {n_index} of {n_total})." if n_total > 1 else ".")
+                    + " Not yet verified against an approved canonical "
+                    + "(per-role baseline pattern bank — D28 — is the next slice)."
                 ),
                 extracted_content=text_excerpt or None,
-                bbox=first.bbox,
-                page=first.page,
-                doc_pos_hint=_doc_pos(first.role, first.subtype, idx),
+                bbox=blk.bbox,
+                page=blk.page,
+                # Stable per-block doc_pos so reading order is preserved
+                # within the role bucket; nudges by occurrence index.
+                doc_pos_hint=_doc_pos(blk.role, blk.subtype, idx) + (n_index - 1) * 0.02,
             )
         )
 

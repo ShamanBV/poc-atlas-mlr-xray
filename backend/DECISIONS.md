@@ -393,6 +393,55 @@ that reads the curated store. The `library.set_library` API stays
 the same.
 **Status:** `pinned` (intentional temporary state).
 
+### D28 — Structural zones: one per block (no role-level dedupe)
+
+**Current value:** `structural_check.run()` emits one `clean / info`
+Verdict per *block*, not per role. When N>1 blocks share a role, the
+labels carry an "(K of N)" suffix and `sub_layer` gets a `:K` suffix
+to keep zone ids stable.
+**Where:** `src/mlr/precheck/structural_check.py` → `run()`.
+**Why this value:** the legal/MLR reviewer needs to validate every
+granular structural item individually — the top of a Cosentyx UK
+email decomposes into `promotional_notice`, `PI_link`,
+`adverse_events_reporting`, `another promotional_notice`, and each is
+a separate compliance check. Aggregating them under a single
+"Promotional notice (2)" row hides the individual reviewability.
+**How to revise:** if reviewers prefer fewer rows for icons / minor
+visuals, keep them deduped (visuals path still dedupes by `kind`)
+while leaving text blocks granular. Or add a UI-side toggle:
+"compact" (deduped) vs "granular" (per-block).
+**Status:** `pinned`.
+
+### D29 — UK baseline pattern bank (next slice — not implemented)
+
+**Current value:** structural zones emit `Extracted` (status `clean`,
+severity `info`) without verifying the block's text against an
+approved canonical. The status text is honest about this limited
+claim.
+**Where to wire:** would extend `structural_check.run()` to query a
+new `mlr.precheck.baseline` module; `mlr/ingest/baseline_bootstrap.py`
+walks the ~25 approved UK emails, harvests text per `(role,
+brand?)` slice, builds a `BaselinePattern` corpus.
+**Why this matters:** "Extracted" → "Pattern match · 0.94 (n=23,
+24 months)" — the same drift signal Layer 1 produces for claims, but
+applied to every structural element. Drives reviewers to "yes this
+matches the approved standard" vs "extracted but novel — needs review".
+The bootstrapping flow already exists for claims (D5/D25); the
+structural path mirrors it.
+**Implementation sketch:**
+1. `BaselinePattern { role: str, exemplars: list[str], n: int,
+   coverage: float, window_months: int }`
+2. `baseline_bootstrap.bootstrap_from_dir(path, role_set)` —
+   per-role ApprovedClaim-like corpus, deduped by exact text.
+3. `structural_check` calls `baseline.match(role, blk.text)` →
+   returns best similarity + matched exemplar id; status maps:
+   `≥ 0.95 → clean / "Pattern match · X.XX"`,
+   `≥ 0.80 → attn  / "Drift · X.XX"`,
+   `< 0.80 → miss  / "Novel · X.XX"`.
+4. Pin the same hybrid similarity used by Layer 1 (cosine + char
+   ratio); revisit thresholds per role.
+**Status:** `documented` (not implemented).
+
 ### D27 — Adapter downgrades reference-shaped BODY blocks to REFERENCE
 
 **Current value:** when the upstream extractor labels a citation
