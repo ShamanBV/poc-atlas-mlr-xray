@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import pytest
 
-from mlr.precheck import library
+from mlr.precheck import baseline, library
 
 
 @pytest.fixture(autouse=True)
-def _reset_library() -> None:
-    """Restore the hardcoded library before each test."""
+def _reset_corpora() -> None:
+    """Restore the hardcoded library + clear baseline before each test."""
     library.reset_library()
+    baseline.reset_baseline()

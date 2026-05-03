@@ -35,6 +35,7 @@ role (because the block isn't present in the asset). No overlap.
 
 from __future__ import annotations
 
+from . import baseline as _baseline
 from .schema import ExtractedAsset, ExtractedBlock, ExtractedVisual
 from .verdict import Verdict
 
@@ -201,22 +202,49 @@ def run(asset: ExtractedAsset) -> list[Verdict]:
         suffix = "" if n_total == 1 else f":{n_index}"
         sub_layer = f"structural:{key.lower()}{suffix}"
 
+        # ── baseline pattern recognition (D29) ──────────────────────
+        # Compare the block's text to the role's baseline corpus (built
+        # from approved UK emails by the extractor service, or
+        # bootstrapped from existing extractions). Maps to status:
+        #   ≥0.95 clean / Pattern match
+        #   0.80-0.95 attn / Drift
+        #   <0.80 miss / Novel
+        # No baseline available → naive "Extracted" / clean.
+        baseline_role = blk.role  # baseline keys on extractor role names
+        bm = _baseline.match(baseline_role, blk.text)
+        canonical_text: str | None = None
+        if bm is not None:
+            status, severity, evidence_template = _baseline.status_for_score(bm.score)
+            evidence = evidence_template.format(score=bm.score)
+            evidence_detail = (
+                f"Block role {key} compared to {bm.role_corpus_size} "
+                f"approved exemplar{'s' if bm.role_corpus_size != 1 else ''} "
+                f"in the UK baseline; best match {bm.score:.2f} "
+                f"(coverage {bm.exemplar.coverage:.0%}, n={bm.exemplar.n})."
+            )
+            canonical_text = bm.exemplar.text
+        else:
+            status, severity = "clean", "info"
+            evidence = "Extracted"
+            evidence_detail = (
+                f"Block role {key} present in this asset"
+                + (f" (occurrence {n_index} of {n_total})." if n_total > 1 else ".")
+                + " No UK baseline exemplars for this role yet — "
+                + "naive 'extracted' status until the corpus is bootstrapped."
+            )
+
         verdicts.append(
             Verdict(
                 layer="cascade",
                 sub_layer=sub_layer,
                 label=label_for_zone,
-                status="clean",
-                severity="info",
+                status=status,  # type: ignore[arg-type]
+                severity=severity,  # type: ignore[arg-type]
                 lanes=[lane],  # type: ignore[list-item]
-                evidence="Extracted",
-                evidence_detail=(
-                    f"Block role {key} present in this asset"
-                    + (f" (occurrence {n_index} of {n_total})." if n_total > 1 else ".")
-                    + " Not yet verified against an approved canonical "
-                    + "(per-role baseline pattern bank — D28 — is the next slice)."
-                ),
+                evidence=evidence,
+                evidence_detail=evidence_detail,
                 extracted_content=text_excerpt or None,
+                canonical_content=canonical_text,
                 bbox=blk.bbox,
                 page=blk.page,
                 # Stable per-block doc_pos so reading order is preserved

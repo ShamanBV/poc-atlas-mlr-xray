@@ -24,8 +24,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 
 from mlr.api_views.document_xray import to_document_xray
 from mlr.fixtures import assets as fixture_assets
-from mlr.ingest import library_bootstrap
-from mlr.precheck import abbreviation_check, claim_check, document_check, library, structural_check
+from mlr.ingest import baseline_bootstrap, library_bootstrap
+from mlr.precheck import abbreviation_check, baseline, claim_check, document_check, library, structural_check
 from mlr.precheck.asset_builder import build_asset
 from mlr.precheck.dependency_rules import load_default_catalog
 from mlr.precheck.schema import Asset, ErrorBody, ErrorResponse
@@ -73,6 +73,19 @@ def _bootstrap_library_at_startup() -> int:
 
 
 _LIBRARY_SIZE_AT_BOOT = _bootstrap_library_at_startup()
+
+
+# Bootstrap the structural baseline (D29) — curated file wins, falls
+# back to walking the same UK extraction directory.
+def _bootstrap_baseline_at_startup() -> int:
+    extractions_dir = fixture_assets._EXTRACTOR_OUTPUTS  # noqa: SLF001
+    exemplars = baseline_bootstrap.load_default_baseline(extractions_dir)
+    if exemplars:
+        baseline.set_baseline(exemplars)
+    return baseline.total_size()
+
+
+_BASELINE_SIZE_AT_BOOT = _bootstrap_baseline_at_startup()
 
 
 def _error(http_status: int, code: str, message: str) -> JSONResponse:
@@ -286,4 +299,5 @@ def health() -> dict:
         "catalog_version": _CATALOG.catalog_version,
         "library_size": library.total_size(),
         "library_bootstrapped": library.total_size() != 3,  # 3 = the hardcoded fallback
+        "baseline_size": baseline.total_size(),
     }
