@@ -1,1368 +1,401 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Document X-Ray – Shaman</title>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-<style>
-*,*::before,*::after{box-sizing:border-box;}
-html,body{margin:0;height:100%;overflow:hidden;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sans-serif;background:#f3f4f6;font-size:13px;color:#111827;}
-#root{height:100vh;display:flex;flex-direction:column;}
-::-webkit-scrollbar{width:5px;}
-::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px;}
-::-webkit-scrollbar-track{background:transparent;}
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MLR X-Ray — Shaman (live backend)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+  <!-- Cache-bust the JSX/JS files: Babel-standalone caches by URL regardless
+       of HTTP headers. Bump the v= when editing any of the JSX files. -->
+  <script>window.__JSX_V__ = '5';</script>
+  <script src="adapter.js?v=5"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; overflow: hidden; }
+    body { font-family: 'Noto Sans', sans-serif; background: #FAFAFA; color: #1F1F1F; font-size: 14px; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C7C7C7; border-radius: 3px; }     /* grey.300 */
+    ::-webkit-scrollbar-thumb:hover { background: #A0A0A0; }                  /* grey.400 */
+    textarea:focus { border-color: #00A66F !important; }                      /* primary.500 */
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* ── SHAMAN HEADER ─────────────────────── */
-.sh-header{height:40px;background:#d1fae5;border-bottom:1px solid #a7f3d0;display:flex;align-items:center;padding:0 16px;flex-shrink:0;}
-.sh-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(5,150,105,.3);flex-shrink:0;}
-.sh-wordmark{font-size:13px;font-weight:800;color:#065f46;letter-spacing:-.4px;margin-left:8px;}
-.sh-sep{width:1px;height:16px;background:#a7f3d0;margin:0 12px;}
-.sh-crumb{display:flex;align-items:center;gap:5px;font-size:11px;}
-.sh-crumb span{color:#6ee7b7;}
-.sh-crumb b{color:#047857;font-weight:600;}
-.sh-nav{display:flex;align-items:center;gap:1px;margin-left:auto;}
-.sh-navbtn{padding:4px 10px;font-size:11px;font-weight:500;color:#047857;border:none;background:transparent;border-radius:4px;cursor:pointer;transition:background .12s;}
-.sh-navbtn:hover{background:rgba(5,150,105,.12);}
-.sh-avatar{width:26px;height:26px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;margin-left:8px;cursor:pointer;}
+    .pill {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+      border-radius: 12px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px;
+    }
+    .pill.dot { width: 6px; height: 6px; border-radius: 50%; padding: 0; }
 
-/* ── SHAMAN MLR HEADER (matches apryse-designer AppShell style) ─────── */
-/* Tokens (mirroring apryse-designer/app/globals.css):
-     --shaman-green-50:  #E5F6EE
-     --shaman-green-600: #00A66F
-     --shaman-grey-50:   #EFEFEF
-     --shaman-grey-200:  #BDBDBD
-     --shaman-grey-500:  #6F7E7F
-*/
-.mlr-header{height:48px;display:flex;align-items:center;flex-shrink:0;background:#E5F6EE;border-bottom:1px solid #EFEFEF;}
-.mlr-mark{width:48px;height:48px;background:#00A66F;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none;}
-.mlr-name-block{display:flex;align-items:center;gap:8px;padding:0 16px;}
-.mlr-brand{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#00A66F;}
-.mlr-dot{color:#BDBDBD;font-size:13px;}
-.mlr-title{font-size:14px;font-weight:700;color:#00A66F;white-space:nowrap;}
-.mlr-doc{font-size:12px;font-weight:500;color:#6F7E7F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;margin-left:6px;}
-.mlr-doctype{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#00A66F;background:#fff;border:1px solid #C1E8D6;padding:2px 7px;border-radius:10px;}
-.mlr-avatar{width:28px;height:28px;border-radius:50%;background:#6F7E7F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.3px;flex-shrink:0;cursor:pointer;border:2px solid #E5F6EE;box-shadow:0 0 0 1px #BDBDBD;transition:transform .12s;}
-.mlr-avatar:hover{transform:translateY(-1px);}
-.mlr-avatar.alt{background:#00A66F;}
-.mlr-libbtn{font-size:13px;font-weight:500;color:#323232;background:#fff;border:1px solid #BDBDBD;border-radius:6px;padding:5px 14px;cursor:pointer;transition:all .14s;font-family:inherit;margin-left:12px;margin-right:14px;display:inline-flex;align-items:center;gap:6px;}
-.mlr-libbtn:hover,.mlr-libbtn.open{background:#E5F6EE;border-color:#00A66F;color:#00A66F;}
-.mlr-libbtn .caret{font-size:9px;transition:transform .12s;}
-.mlr-libbtn.open .caret{transform:rotate(180deg);}
+    /* Backend-status banner — hidden by default; show with ?debug=1. */
+    #backend-banner { display: none; }
+    body.debug #backend-banner {
+      display: flex; position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: #1F1F1F; color: #FAFAFA; font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; padding: 5px 12px; align-items: center; gap: 12px;
+    }
+    body.debug #backend-banner .ok  { color: #9DD5B8; }
+    body.debug #backend-banner .err { color: #DB2777; }
+    body.debug #backend-banner code { color: #C1E8D6; }
 
-/* Library popover — anchored to the Library button on the header */
-.lib-pop{position:absolute;top:54px;right:14px;z-index:200;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.14);min-width:340px;max-width:480px;max-height:60vh;overflow:hidden;display:flex;flex-direction:column;animation:libPopIn .14s ease-out;}
-@keyframes libPopIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
-.lib-pop-hdr{padding:10px 14px 6px;border-bottom:1px solid #f3f4f6;font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:6px;}
-.lib-pop-list{overflow-y:auto;}
-.lib-pop-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid #f7f7f7;transition:background .1s;}
-.lib-pop-row:hover{background:#f9fafb;}
-.lib-pop-row.active{background:#E5F6EE;}
-.lib-pop-row .badge{flex-shrink:0;width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:#6F7E7F;}
-.lib-pop-row.active .badge{background:#00A66F;}
-.lib-pop-row .label{flex:1;display:flex;flex-direction:column;min-width:0;}
-.lib-pop-row .brand{font-size:13px;font-weight:600;color:#323232;}
-.lib-pop-row .meta{font-size:10px;color:#6F7E7F;text-transform:uppercase;letter-spacing:.4px;}
-.lib-pop-row .check{flex-shrink:0;font-size:14px;color:#00A66F;width:16px;text-align:right;}
+    /* ── Shaman MLR header (apryse-designer style + Frame 481) ─────── */
+    .mlr-header { height: 48px; display: flex; align-items: center; flex-shrink: 0;
+      background: #E5F6EE; border-bottom: 1px solid #EFEFEF; }
+    .mlr-mark   { width: 48px; height: 48px; background: #00A66F; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0; }
+    .mlr-name-block { display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+    .mlr-brand  { font-size: 11px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: #00A66F; white-space: nowrap; }
+    .mlr-doc    { font-size: 13px; font-weight: 600; color: #323232; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; max-width: 380px; margin-left: 6px; }
+    .mlr-doctype { display: inline-flex; align-items: center; font-size: 9px;
+      font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #00A66F;
+      background: #fff; border: 1px solid #C1E8D6; padding: 2px 7px; border-radius: 10px; }
+    .mlr-avatar { width: 28px; height: 28px; border-radius: 50%; background: #6F7E7F;
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; letter-spacing: .3px; flex-shrink: 0;
+      cursor: pointer; border: 2px solid #E5F6EE; box-shadow: 0 0 0 1px #BDBDBD;
+      transition: transform .12s; }
+    .mlr-avatar:hover { transform: translateY(-1px); }
+    .mlr-avatar.alt   { background: #00A66F; }
+    .mlr-savebtn { font-size: 13px; font-weight: 600; color: #fff; background: #00A66F;
+      border: 1px solid #00A66F; border-radius: 6px; padding: 5px 16px; cursor: pointer;
+      font-family: inherit; transition: all .14s; margin-left: 12px; }
+    .mlr-savebtn:hover { background: #008859; border-color: #008859; }
+    .mlr-libbtn  { font-size: 13px; font-weight: 500; color: #323232; background: #fff;
+      border: 1px solid #BDBDBD; border-radius: 6px; padding: 5px 14px; cursor: pointer;
+      font-family: inherit; transition: all .14s; margin-left: 8px;
+      display: inline-flex; align-items: center; gap: 6px; }
+    .mlr-libbtn:hover, .mlr-libbtn.open {
+      background: #fff; border-color: #00A66F; color: #00A66F; }
+    .mlr-libbtn .caret { font-size: 9px; transition: transform .12s; }
+    .mlr-libbtn.open .caret { transform: rotate(180deg); }
+    .mlr-user-avatar { width: 30px; height: 30px; border-radius: 50%; background: #6F7E7F;
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; cursor: pointer;
+      margin-left: 12px; margin-right: 14px; border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #BDBDBD; }
 
-/* ── TOOLBAR ───────────────────────────── */
-.toolbar{height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
-
-/* ── LAYOUT ────────────────────────────── */
-.main{flex:1;display:flex;overflow:hidden;}
-.pdf-pane{flex:1;overflow:auto;padding:18px 22px;background:#f9fafb;}
-.right-panel{width:410px;background:#fff;border-left:1px solid #e5e7eb;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
-.btmbar{display:flex;align-items:center;gap:8px;padding:0 14px;height:36px;flex-shrink:0;background:#fff;border-top:1px solid #e5e7eb;}
-
-/* ── BUTTONS ───────────────────────────── */
-.btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .14s;white-space:nowrap;font-family:inherit;line-height:1.4;}
-.btn:disabled{opacity:.5;cursor:not-allowed;}
-.btn-primary{background:#059669;color:#fff;border-color:#059669;}
-.btn-primary:hover:not(:disabled){background:#047857;}
-.btn-ghost{background:#fff;color:#555;border-color:#e5e7eb;}
-.btn-ghost:hover:not(:disabled){background:#f8f7f5;}
-.btn-danger{color:#dc2626;border-color:#fca5a5;background:#fff;}
-.btn-danger:hover{background:#fef2f2;}
-.btn-accept{color:#059669;border-color:#6ee7b7;background:#fff;}
-.btn-accept:hover{background:#f0fdf4;}
-.btn-icon{padding:2px 5px;font-size:12px;border:none;background:transparent;cursor:pointer;border-radius:3px;color:#d1d5db;transition:color .1s,background .1s;font-family:inherit;}
-.btn-icon:hover{background:#f3f3f1;color:#555;}
-.btn-icon.g:hover{color:#059669;background:#f0fdf4;}
-.btn-icon.r:hover{color:#dc2626;background:#fef2f2;}
-.ds-btn{display:inline-flex;align-items:center;gap:3px;padding:2px 10px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid;transition:opacity .14s;font-family:inherit;}
-.ds-btn:hover{opacity:.72;}
-
-/* ── SEGMENTED CONTROL ─────────────────── */
-.seg-ctrl{display:inline-flex;background:#f3f4f6;border-radius:6px;padding:2px;gap:1px;}
-.seg-btn{padding:3px 9px;border-radius:4px;font-size:11px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#6b7280;transition:all .12s;font-family:inherit;white-space:nowrap;}
-.seg-btn.active{background:#fff;color:#111827;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-.seg-btn:not(.active):hover{color:#374151;}
-
-/* ── ASSET META CARD ───────────────────── */
-.asset-meta-card{margin:10px 12px 2px;border:1.5px solid #e5e7eb;border-radius:8px;overflow:hidden;flex-shrink:0;}
-.amc-hdr{display:flex;align-items:center;gap:7px;padding:7px 11px;background:#f9fafb;border-bottom:1px solid #e5e7eb;cursor:pointer;user-select:none;}
-.amc-body{display:grid;grid-template-columns:1fr 1fr;background:#fff;}
-.amc-cell{padding:7px 11px;border-top:1px solid #f3f4f6;}
-.amc-cell:nth-child(odd){border-right:1px solid #f3f4f6;}
-.meta-key{font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;}
-.meta-val{font-size:13px;font-weight:500;color:#111827;}
-
-/* ── FILTER CHIPS ──────────────────────── */
-.fchip{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .13s;white-space:nowrap;}
-.fchip.active{border-color:currentColor;background:rgba(0,0,0,.04);}
-.fchip:not(.active){opacity:.45;}
-.fchip:hover{opacity:1;}
-
-/* ── ANN RECTS — border only ───────────── */
-.ann-rect{position:absolute;cursor:pointer;border-radius:1px;transition:box-shadow .15s;}
-.ann-rect:hover{z-index:15!important;}
-.ann-rect.sel{z-index:20!important;}
-.ann-rect .rl{position:absolute;top:-18px;left:-1px;font-size:8px;font-weight:700;letter-spacing:.5px;padding:1px 5px;border-radius:2px 2px 0 0;color:#fff;white-space:nowrap;pointer-events:none;font-family:'SF Mono',Menlo,monospace;opacity:0;transition:opacity .14s;}
-.ann-rect:hover .rl,.ann-rect.sel .rl{opacity:1;}
-
-/* ── GROUP HEADER ──────────────────────── */
-.grp-hdr{display:flex;align-items:center;padding:7px 13px;cursor:pointer;user-select:none;border-bottom:1px solid #f3f4f6;position:sticky;top:0;background:#fff;z-index:2;transition:background .1s;}
-.grp-hdr:hover{background:#f9fafb;}
-
-/* ── CLAIM CARD ────────────────────────── */
-.claim-card{border-bottom:1px solid #f3f4f6;background:#fff;}
-.claim-header{display:flex;align-items:flex-start;gap:8px;padding:9px 13px 8px 26px;cursor:pointer;transition:background .1s;position:relative;}
-.claim-header:hover{background:#f9fafb;}
-.claim-header.sel{background:#f4fbf7;}
-.claim-assets{padding:0 13px 9px 42px;display:flex;flex-direction:column;gap:4px;}
-.asset-row{display:flex;align-items:flex-start;gap:6px;padding:4px 8px;border-radius:5px;cursor:pointer;transition:background .1s;}
-.asset-row:hover{background:#f4fbf7;}
-.asset-row.sel{background:#ecfaf4;}
-
-/* ── ANN ROW (non-claim) ───────────────── */
-.ann-row{padding:7px 13px 7px 26px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background .1s;position:relative;}
-.ann-row:hover{background:#f9fafb;}
-.ann-row.sel{background:#f4fbf7;}
-.ann-row.done{opacity:.44;}
-
-/* ── PANEL SLIDE ───────────────────────── */
-.panel-view{position:absolute;inset:0;background:#fff;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
-.panel-view.vis{transform:translateX(0);}
-
-/* ── STRUCTURED ────────────────────────── */
-.md-wrap{flex:1;overflow:auto;padding:14px 16px;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:11px;line-height:1.8;color:#374151;}
-.md-type-h{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin:0 0 5px;padding-bottom:3px;border-bottom:1px solid #eee;}
-.md-item{display:flex;gap:7px;padding:1px 0;}
-.md-ref{font-size:10px;color:#9ca3af;margin-left:16px;line-height:1.6;}
-
-/* ── TABS ──────────────────────────────── */
-.tab-btn{padding:9px 13px 8px;font-size:12px;background:transparent;border:none;cursor:pointer;border-bottom:2.5px solid transparent;transition:all .14s;font-family:inherit;white-space:nowrap;}
-
-/* ── TOOLTIP ───────────────────────────── */
-.tip-w{position:relative;display:inline-flex;}
-.tip-b{position:absolute;bottom:calc(100%+5px);left:50%;transform:translateX(-50%);background:#111;color:#fff;font-size:11px;padding:5px 10px;border-radius:5px;pointer-events:none;z-index:999;line-height:1.45;text-align:center;}
-
-/* ── CONFIRM ───────────────────────────── */
-.cpop{position:absolute;bottom:calc(100%+5px);right:0;background:#fff;border:1px solid #d1d5db;border-radius:7px;padding:11px 13px;box-shadow:0 6px 20px rgba(0,0,0,.12);width:186px;z-index:500;}
-
-/* ── MODAL ─────────────────────────────── */
-.mbg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fIn .14s;}
-.mbox{background:#fff;border-radius:9px;padding:20px 22px;width:400px;box-shadow:0 16px 48px rgba(0,0,0,.18);}
-
-/* ── TOAST ─────────────────────────────── */
-.tw{position:fixed;top:86px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:5px;pointer-events:none;}
-.t{background:#1a1a1a;color:#fff;padding:7px 14px;border-radius:6px;font-size:11.5px;font-weight:500;animation:tIn .17s ease;box-shadow:0 3px 10px rgba(0,0,0,.18);}
-.t.s{background:#059669;}.t.w{background:#d97706;}.t.i{background:#2563eb;}
-
-/* ── FORM ──────────────────────────────── */
-select,textarea{font-family:inherit;font-size:12px;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;width:100%;outline:none;transition:border-color .14s;}
-select:focus,textarea:focus{border-color:#059669;}
-textarea{resize:vertical;line-height:1.55;}
-
-/* ── MISC ──────────────────────────────── */
-.spin{animation:sp 1s linear infinite;}
-@keyframes sp{to{transform:rotate(360deg);}}
-@keyframes fIn{from{opacity:0;}to{opacity:1;}}
-@keyframes tIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:none;}}
-.fadein{animation:fIn .17s ease;}
-.add-ov{position:absolute;inset:0;cursor:crosshair;z-index:50;background:rgba(5,150,105,.04);border:2px dashed rgba(5,150,105,.4);display:flex;align-items:center;justify-content:center;}
-
-.chip{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px;}
-.confbar{height:3px;background:#f0f0f0;border-radius:2px;overflow:hidden;}
-.confbar-fill{height:100%;border-radius:2px;transition:width .3s;}
-.sl{font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.55px;margin-bottom:4px;}
-
-/* ── MULTI-SELECT CHECKBOX ─────────────────────────── */
-.sel-check{width:15px;height:15px;border-radius:3px;border:1.5px solid #d1d5db;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:border-color .12s,background .12s;margin-top:1px;}
-.sel-check:hover{border-color:#059669;}
-.sel-check.checked{background:#059669;border-color:#059669;}
-.sel-check.partial{background:#d1fae5;border-color:#059669;}
-
-/* ── BULK ACTION BAR ───────────────────────────────── */
-.bulk-bar{position:absolute;bottom:12px;left:12px;right:12px;background:#1f2937;border-radius:8px;display:flex;align-items:center;gap:8px;padding:8px 12px;box-shadow:0 4px 16px rgba(0,0,0,.22);z-index:30;animation:slideUp .18s ease;}
-@keyframes slideUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
-</style>
+    /* Library popover */
+    .lib-pop { position: absolute; top: 56px; right: 14px; z-index: 200; background: #fff;
+      border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.14);
+      min-width: 340px; max-width: 480px; max-height: 60vh; overflow: hidden;
+      display: flex; flex-direction: column; animation: libPopIn .14s ease-out; }
+    @keyframes libPopIn { from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); } }
+    .lib-pop-hdr  { padding: 10px 14px 6px; border-bottom: 1px solid #f3f4f6;
+      font-size: 9px; font-weight: 700; color: #9ca3af; text-transform: uppercase;
+      letter-spacing: .6px; }
+    .lib-pop-list { overflow-y: auto; }
+    .lib-pop-row  { display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+      cursor: pointer; border-bottom: 1px solid #f7f7f7; transition: background .1s; }
+    .lib-pop-row:hover { background: #f9fafb; }
+    .lib-pop-row.active { background: #E5F6EE; }
+    .lib-pop-row .badge { flex-shrink: 0; width: 22px; height: 22px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center; font-size: 10px;
+      font-weight: 700; color: #fff; background: #6F7E7F; }
+    .lib-pop-row.active .badge { background: #00A66F; }
+    .lib-pop-row .label { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .lib-pop-row .brand { font-size: 13px; font-weight: 600; color: #323232; }
+    .lib-pop-row .meta  { font-size: 10px; color: #6F7E7F; text-transform: uppercase;
+      letter-spacing: .4px; }
+    .lib-pop-row .check { flex-shrink: 0; font-size: 14px; color: #00A66F; width: 16px;
+      text-align: right; }
+  </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useRef, useEffect, useCallback, createContext, useContext } = React;
+<div id="backend-banner">backend: <span id="backend-status">connecting…</span></div>
+<script>
+  // Show backend debug banner only when ?debug=1 is in the URL.
+  if (new URLSearchParams(window.location.search).get('debug') === '1') {
+    document.body.classList.add('debug');
+  }
+</script>
 
-/* ═══════════════════════════════════════════════════════
-   COLOR PALETTE — green + grey only
-   primary.800 = #065f46  (Claims — darkest)
-   primary.600 = #059669  (Content/Body)
-   primary.300 = #6ee7b7  (Visuals)
-   grey.800    = #374151  (Regulatory / Legal / Reference)
-   grey.400    = #9ca3af  (Footnote, subdued)
-═══════════════════════════════════════════════════════ */
-const P800 = '#065f46';
-const P600 = '#059669';
-const P300 = '#6ee7b7';
-const G800 = '#374151';
-const G400 = '#9ca3af';
+<script type="text/babel" src="XRayData.jsx?v=5"></script>
+<script type="text/babel" src="XRayEmail.jsx?v=5"></script>
+<script type="text/babel" src="XRayDrawer.jsx?v=5"></script>
 
-const TC = {
-  CLAIM:      {color:P800, glow:`rgba(6,95,70,.7)`,   short:'Claim',      group:'claim'},
-  BODY:       {color:P600, glow:`rgba(5,150,105,.7)`, short:'Content',    group:'content'},
-  AUD_RESTR:  {color:G800, glow:`rgba(55,65,81,.7)`, short:'Audience',   group:'legal'},
-  DATA_VIS:   {color:P300, glow:`rgba(110,231,183,.7)`,short:'Visual',    group:'visual'},
-  REFERENCE:  {color:G800, glow:`rgba(55,65,81,.7)`,  short:'Reference',  group:'legal'},
-  FOOTNOTE:   {color:G400, glow:`rgba(156,163,175,.7)`,short:'Footnote',  group:'legal'},
-  REGULATORY: {color:G800, glow:`rgba(55,65,81,.7)`,  short:'Regulatory', group:'legal'},
-  LEGAL:      {color:G800, glow:`rgba(55,65,81,.7)`,  short:'Legal',      group:'legal'},
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── RESTRICTED PALETTE ───────────────────────────────────────────────────────
+// Per design directive: greens (primary.50–.800), greys (.50–.800), warning
+// yellow.600, critical pink.600. Everything else (purple/brown/red/orange/blue
+// in the original prototype) maps onto these tokens.
+//
+// Mutation strategy: the prototype's helpers (`statusColor`, `laneToken`, …)
+// were defined in XRayData.jsx, closing over the local `C` object. The script
+// then exposes that same object reference as `window.C`. We MUTATE C's
+// properties below — the helpers' references are unchanged but their reads
+// now return the new values. The same is done for nested laneM/L/R objects.
+const PALETTE = {
+  // Greens
+  primary50:  '#F6FCF9',
+  primary100: '#E5F6EE',
+  primary200: '#C1E8D6',
+  primary300: '#9DD5B8',
+  primary400: '#47C18E',
+  primary500: '#00A66F',  // Shaman brand
+  primary600: '#008859',
+  primary700: '#006A45',
+  primary800: '#004D31',
+  // Greys
+  grey50:  '#FAFAFA',
+  grey100: '#F0F0F0',
+  grey200: '#E0E0E0',
+  grey300: '#C7C7C7',
+  grey400: '#A0A0A0',
+  grey500: '#7A7A7A',
+  grey600: '#525252',
+  grey700: '#3A3A3A',
+  grey800: '#1F1F1F',
+  // Status accents
+  warning600: '#D97706',
+  warning100: '#FEF3C7',
+  warning300: '#FCD34D',
+  critical600: '#DB2777',
+  critical100: '#FCE7F3',
+  critical300: '#F9A8D4',
+  white: '#FFFFFF',
 };
 
-const SC={
-  edited:    {bg:'#f0fdf4',c:'#065f46',l:'edited'},
-  accepted:  {bg:'#d1fae5',c:'#065f46',l:'accepted'},
-  new:       {bg:'#ecfdf5',c:'#059669',l:'new'},
-  processing:{bg:'#f9fafb',c:'#6b7280',l:'processing…'},
-};
-const cc=v=>v>=70?P600:v>=40?'#d97706':'#dc2626';
+(function applyRestrictedPalette() {
+  const C = window.C;
+  if (!C) return;  // XRayData.jsx not loaded yet — should never happen
+  Object.assign(C, {
+    // Brand greens (kept names for prototype compatibility)
+    green600: PALETTE.primary500,
+    green400: PALETTE.primary400,
+    green100: PALETTE.primary200,
+    green50:  PALETTE.primary100,
+    green25:  PALETTE.primary50,
+    // Status — clean → primary; attn → warning yellow; miss → critical pink
+    clean:       PALETTE.primary600,
+    cleanBg:     PALETTE.primary50,
+    cleanBorder: PALETTE.primary300,
+    attn:        PALETTE.warning600,
+    attnBg:      PALETTE.warning100,
+    attnBorder:  PALETTE.warning300,
+    miss:        PALETTE.critical600,
+    missBg:      PALETTE.critical100,
+    missBorder:  PALETTE.critical300,
+    // Greys (prototype names → restricted greys)
+    grey900: PALETTE.grey800,
+    grey800: PALETTE.grey700,
+    grey700: PALETTE.grey600,
+    grey600: PALETTE.grey500,
+    grey500: PALETTE.grey500,
+    grey400: PALETTE.grey400,
+    grey300: PALETTE.grey400,
+    grey200: PALETTE.grey300,
+    grey100: PALETTE.grey200,
+    grey50:  PALETTE.grey100,
+    grey25:  PALETTE.grey50,
+    white:   PALETTE.white,
+    // Misc — diff additions / removals; old "blue" repurposed
+    blue:     PALETTE.primary500,
+    blueBg:   PALETTE.primary50,
+    addGreen: PALETTE.primary100,
+    addText:  PALETTE.primary700,
+    redLight: PALETTE.critical100,
+  });
+  // Lane chips — distinguished by intensity within the restricted palette.
+  // Mutate in place so lane tokens captured by the helpers see the new values.
+  Object.assign(C.laneM, { bg: PALETTE.primary100, text: PALETTE.primary700 });
+  Object.assign(C.laneL, { bg: PALETTE.grey100,    text: PALETTE.grey700    });
+  Object.assign(C.laneR, { bg: PALETTE.grey200,    text: PALETTE.grey800    });
+})();
 
-/* ── TOAST ──────────────────────────────────────── */
-const TC2=createContext(null);
-function ToastProvider({children}){
-  const [ts,setTs]=useState([]);
-  const show=useCallback((msg,type='s')=>{
-    const id=Date.now(); setTs(p=>[...p,{id,msg,type}]);
-    setTimeout(()=>setTs(p=>p.filter(t=>t.id!==id)),2400);
-  },[]);
-  return <TC2.Provider value={show}>{children}<div className="tw">{ts.map(t=><div key={t.id} className={`t ${t.type}`}>{t.msg}</div>)}</div></TC2.Provider>;
+// ─── BACKEND CONFIG ───────────────────────────────────────────────────────────
+// Default: localhost:8088 (uvicorn). Override via ?api= query string.
+const params = new URLSearchParams(window.location.search);
+const BACKEND = params.get('api') || 'http://localhost:8088';
+// Default to the Cosentyx real fixture — biggest claim count → most
+// interesting Layer 1 surface. ?asset=… overrides; the in-page <select>
+// also writes to history.replaceState so the URL reflects current.
+const INITIAL_ASSET_ID = params.get('asset') || 'real:cosentyx-uk-rheum-mda-001';
+
+function renderBannerStatus(html, kind) {
+  const el = document.getElementById('backend-status');
+  el.innerHTML = html;
+  el.className = kind || '';
 }
 
-/* ── TOOLTIP ────────────────────────────────────── */
-function Tip({text,wide,children}){
-  const [s,set]=useState(false);
-  return <span className="tip-w" onMouseEnter={()=>set(true)} onMouseLeave={()=>set(false)}>{children}{s&&<span className="tip-b" style={{width:wide?200:'auto',whiteSpace:wide?'normal':'nowrap'}}>{text}</span>}</span>;
-}
-
-/* ── CONFIRM ────────────────────────────────────── */
-function Confirm({text,onConfirm,children}){
-  const [o,set]=useState(false); const ref=useRef();
-  useEffect(()=>{
-    if(!o) return;
-    const h=e=>{if(ref.current&&!ref.current.contains(e.target))set(false);};
-    document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h);
-  },[o]);
-  return <span style={{position:'relative',display:'inline-flex'}} ref={ref}><span onClick={e=>{e.stopPropagation();set(v=>!v);}}>{children}</span>{o&&<div className="cpop"><div style={{fontSize:12,color:'#333',marginBottom:9,fontWeight:500}}>{text}</div><div style={{display:'flex',gap:5}}><button className="btn btn-ghost" onClick={()=>set(false)}>Cancel</button><button className="btn btn-danger" onClick={()=>{set(false);onConfirm();}}>Delete</button></div></div>}</span>;
-}
-
-/* ── MODAL ──────────────────────────────────────── */
-function Modal({open,title,onOk,onCancel,children}){
-  if(!open) return null;
-  return <div className="mbg" onClick={onCancel}><div className="mbox fadein" onClick={e=>e.stopPropagation()}><div style={{fontSize:14,fontWeight:700,marginBottom:14}}>{title}</div>{children}<div style={{display:'flex',justifyContent:'flex-end',gap:7,marginTop:16}}><button className="btn btn-ghost" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={onOk}>Add</button></div></div></div>;
-}
-
-/* ═══════════════════════════════════════════════════════
-   DATA — Claims have nested assets (text + visual children)
-
-   The arrays below are the prototype's INLINE MOCK DATA. We DON'T use
-   them — App boots empty and populates from /api/document-xray/{id}
-   instead (see fetchDocumentXray + the useEffect in App). Kept here
-   as the schema reference and for fallback when the backend is
-   unreachable.
-═══════════════════════════════════════════════════════ */
-const _PROTOTYPE_INIT_CLAIMS = [
-  {
-    id:'c1',
-    type:'CLAIM',
-    name:'HFrEF Stability Risk',
-    headline:'Your HFrEF patients are living at risk, even those who appear stable.',
-    status:'edited',
-    conf:88,
-    refs:['1','2','3'],
-    rect:{t:440,l:5,w:432,h:92},
-    assets:[
-      {id:'c1a1',kind:'text', text:'Your HFrEF patients are living at risk, even those who appear stable.', conf:90, status:'edited', rect:{t:440,l:5,w:432,h:46}},
-      {id:'c1a2',kind:'text', text:'Disease progression in HFrEF is often silent, masking the serious nature of disease.', conf:70, status:'edited', rect:{t:440,l:450,w:247,h:92}},
-      {id:'c1a3',kind:'visual',text:'Clinical outcomes infographic — JAMES case', conf:80, status:'edited', rect:{t:540,l:5,w:692,h:207}},
-    ]
-  },
-  {
-    id:'c2',
-    type:'CLAIM',
-    name:'CARDIOMAX Mortality Benefit',
-    headline:'Patients with HFrEF who seem stable can have more life with CARDIOMAX® vs ACEi.',
-    status:'edited',
-    conf:75,
-    refs:['4','5','6'],
-    rect:{t:540,l:5,w:500,h:80},
-    assets:[
-      {id:'c2a1',kind:'text', text:'Reduces Risk of Death at 5 Years (Barcelona Bio-HF Calculator)', conf:75, status:'edited', rect:{t:550,l:5,w:440,h:36}},
-      {id:'c2a2',kind:'visual',text:'Bar chart — 23% CV death, 18% HF hospitalisations, 21% all-cause mortality', conf:82, status:'edited', rect:{t:595,l:5,w:360,h:120}},
-    ]
-  },
-];
-
-const _PROTOTYPE_INIT_OTHER = [
-  {id:'a3', type:'AUD_RESTR', sub:null, conf:30, status:'edited', text:'This is a promotional material intended for healthcare professionals only', fullText:'Not for distribution to patients.', refs:[], rect:{t:92,l:5,w:692,h:37}},
-  {id:'a5', type:'BODY', sub:'SALUTATION', conf:100, status:'edited', text:'Dear {{Account.Name}},', fullText:'Personalised salutation using CRM merge tag {{Account.Name}}.', refs:[], rect:{t:356,l:5,w:290,h:36}},
-  {id:'a6', type:'BODY', sub:'CUSTOM_TEXT', conf:90, status:'edited', text:'{{customText}}', fullText:'Dynamic content field for personalised body copy.', refs:[], rect:{t:398,l:5,w:210,h:36}},
-  {id:'a1', type:'DATA_VIS', sub:'LOGO', conf:80, status:'edited', text:'Brand logo — CARDIOMAX™', fullText:'Brand logo (CARDIOMAX™ / sacubitril/valsartan) in the email header.', refs:[], rect:{t:5,l:5,w:225,h:78}},
-  {id:'a2', type:'DATA_VIS', sub:'BANNER', conf:80, status:'edited', text:'Brand visual banner', fullText:'Product visual figure in the upper-right of the email header.', refs:[], rect:{t:5,l:243,w:454,h:78}},
-  {id:'a4', type:'DATA_VIS', sub:'HERO', conf:80, status:'edited', text:'Hero image — patient photography', fullText:'Hero lifestyle image featuring an elderly patient.', refs:[], rect:{t:134,l:5,w:692,h:216}},
-  {id:'a11',type:'REFERENCE', sub:null, conf:85, status:'edited', text:'References 1–6', fullText:'1. Ponikowski P et al. Eur Heart J. 2016.\n2. Greene SJ et al. JAMA Cardiol. 2018.\n3. Chioncel O et al. Eur J Heart Fail. 2017.\n4. McMurray JJV et al. N Engl J Med. 2014.\n5. Jhund PS et al. Circulation. 2015.\n6. Docherty KF et al. Eur Heart J. 2018.', refs:[], rect:{t:796,l:5,w:692,h:148}},
-  {id:'a12',type:'REGULATORY', sub:null, conf:90, status:'edited', text:'Legal/regulatory footer disclaimer', fullText:'CARDIOMAX® is a registered trademark. Adverse events should be reported. © 2026 PharmaCo Ltd. All rights reserved. PP-CM-IE-0139.', refs:[], rect:{t:951,l:5,w:692,h:62}},
-];
-
-// App boots empty — populated by fetch on mount.
-const INIT_CLAIMS = [];
-const INIT_OTHER = [];
-
-/* ═══════════════════════════════════════════════════════
-   BACKEND CONFIG + FETCH
-═══════════════════════════════════════════════════════ */
-const URL_PARAMS = new URLSearchParams(window.location.search);
-const BACKEND = URL_PARAMS.get('api') || 'http://localhost:8088';
-const INITIAL_ASSET_ID = URL_PARAMS.get('asset') || 'real:cosentyx-uk-rheum-mda-001';
-
-// Document pane width — backend rect coords are PDF points; multiply
-// by (DOC_DISPLAY_WIDTH / page.width_pt) to get pixel coords. The
-// prototype's email mock was 700px wide; we keep the same display
-// width so the rest of the prototype's layout maths still works.
-const DOC_DISPLAY_WIDTH = 700;
-
-async function fetchJson(url){
+async function fetchJson(url) {
   const r = await fetch(url);
-  if(!r.ok){
-    let body; try{body=await r.json();}catch(_){body={error:{code:'http_'+r.status,message:r.statusText}};}
+  if (!r.ok) {
+    let body;
+    try { body = await r.json(); } catch (_) { body = { error: { code: 'http_' + r.status, message: r.statusText } }; }
     const e = new Error(body?.detail?.error?.message || body?.error?.message || `HTTP ${r.status}`);
     e.code = body?.detail?.error?.code || body?.error?.code || `http_${r.status}`;
     throw e;
   }
   return r.json();
 }
-const fetchDocumentXray = id => fetchJson(`${BACKEND}/api/document-xray/${encodeURIComponent(id)}`);
-const fetchPages        = id => fetchJson(`${BACKEND}/api/preview/${encodeURIComponent(id)}/pages`);
-const fetchAssetList    = ()  => fetchJson(`${BACKEND}/api/assets`);
 
-// Scale a backend payload's rect coords (PDF points) → pixels using
-// the page metadata. Mutates a shallow copy.
-function scaleRectsInPayload(payload, pages){
-  if(!pages || !pages.pages || !pages.pages.length) return payload;
-  // Single-page assumption for the POC; for multi-page we'd index by rect.page.
-  const p = pages.pages[0];
-  const scale = DOC_DISPLAY_WIDTH / p.width_pt;
-  const scaleR = r => r ? {t:r.t*scale, l:r.l*scale, w:r.w*scale, h:r.h*scale} : r;
-  return {
-    ...payload,
-    _docHeight: p.height_pt * scale,
-    claims: (payload.claims||[]).map(c => ({
-      ...c, rect: scaleR(c.rect),
-      assets: (c.assets||[]).map(a => ({...a, rect: scaleR(a.rect)})),
-    })),
-    elements: (payload.elements||[]).map(e => ({...e, rect: scaleR(e.rect)})),
-  };
-}
+const fetchPrecheck = (assetId) =>
+  fetchJson(`${BACKEND}/api/precheck/${encodeURIComponent(assetId)}`);
+const fetchAssetList = () =>
+  fetchJson(`${BACKEND}/api/assets`);
 
-/* ── DOCUMENT IMAGE (replaces prototype's hardcoded EmailContent) ──── */
-// Renders the source PDF's page 1 PNG via /api/preview/{id}/page/1.png.
-// Width is locked to DOC_DISPLAY_WIDTH (700px) so the prototype's
-// rect coords (we scaled them at fetch time) line up.
-function DocumentImage({assetId, height}){
-  const url = `${BACKEND}/api/preview/${encodeURIComponent(assetId)}/page/1.png`;
+// ─── PAGED PREVIEW WITH BBOX OVERLAY ──────────────────────────────────────────
+// Renders the source PDF as one PNG per page (via /api/preview/{id}/page/{n}.png)
+// stacked vertically. A transparent overlay layer sits on top with one
+// absolutely-positioned rectangle per bbox-bound zone — clicking the
+// rectangle selects that zone in the X-Ray drawer; hovering it
+// highlights both sides via shared `hoveredZone` / `selectedZone` state.
+//
+// Why PNG + overlay instead of an iframe: we can't position DOM over an
+// iframe (the embedded PDF viewer paints its own canvas, doesn't expose
+// page coords to the host page). Server-rendered PNGs with known DPI
+// give us a deterministic point→pixel transform.
+const PagedPreview = ({ assetId, asset, emailRef, hoveredZone, selectedZone, onHover, onSelect }) => {
+  const [pages, setPages] = React.useState(null);
+  const [pageError, setPageError] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setPages(null);
+    setPageError(null);
+    fetchJson(`${BACKEND}/api/preview/${encodeURIComponent(assetId)}/pages`)
+      .then(p => { if (!cancelled) setPages(p); })
+      .catch(e => { if (!cancelled) setPageError(e); });
+    return () => { cancelled = true; };
+  }, [assetId]);
+
+  // Group bbox-bound zones by page for the overlay layer.
+  const zonesByPage = React.useMemo(() => {
+    const map = new Map();
+    (asset.zones || []).forEach(z => {
+      if (!z.bbox || !z.page) return;
+      if (!map.has(z.page)) map.set(z.page, []);
+      map.get(z.page).push(z);
+    });
+    return map;
+  }, [asset.zones]);
+
+  if (pageError) {
+    return (
+      <div style={{ flex:1, background:PALETTE.grey100, padding:40, color:PALETTE.critical600 }}>
+        Preview unavailable: {pageError.message}
+      </div>
+    );
+  }
+
   return (
-    <img src={url} alt={`${assetId} preview`} draggable={false}
-      style={{display:'block', width:DOC_DISPLAY_WIDTH, height: height || 'auto', background:'#fff'}}/>
-  );
-}
-
-/* Original prototype's CARDIOMAX placeholder lives here for reference,
-   inside _PrototypeEmailContent. Unused at runtime. */
-function _PrototypeEmailContent(){
-  return (
-    <div style={{fontFamily:'Arial,Helvetica,sans-serif',background:'#fff',width:700}}>
-      <div style={{display:'flex',height:90,borderBottom:'1px solid #e8e8e8'}}>
-        <div style={{width:240,display:'flex',alignItems:'center',justifyContent:'center',background:'#fafafa',borderRight:'1px solid #eee',flexShrink:0}}>
-          <div style={{textAlign:'center'}}>
-            <div style={{width:36,height:36,background:'linear-gradient(135deg,#d4a017,#e8b84b)',margin:'0 auto 4px',borderRadius:5,display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'#fff',fontSize:16,fontWeight:900}}>C</span></div>
-            <div style={{fontSize:12,fontWeight:800,color:'#1a1a2e'}}>CARDIOMAX™</div>
-            <div style={{fontSize:9,color:'#777',letterSpacing:.5}}>sacubitril/valsartan</div>
-          </div>
-        </div>
-        <div style={{flex:1,background:'linear-gradient(135deg,#1a3a5c,#2d5a8f 60%,#1a3a5c)',display:'flex',alignItems:'center',justifyContent:'flex-end',padding:'0 24px'}}>
-          <div style={{width:90,height:48,background:'rgba(255,255,255,.12)',borderRadius:4,border:'1px solid rgba(255,255,255,.2)',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,.3)',fontSize:9,fontFamily:'monospace'}}>brand visual</span></div>
-        </div>
-      </div>
-      <div style={{height:44,background:'#f4f4f5',display:'flex',alignItems:'center',justifyContent:'center',borderBottom:'1px solid #e8e8e8'}}><span style={{fontSize:11,color:'#555',fontStyle:'italic'}}>This is a promotional material intended for healthcare professionals only</span></div>
-      <div style={{height:220,background:'linear-gradient(120deg,#1e3a5f,#2b5496 45%,#1e3a5f)',position:'relative',overflow:'hidden'}}>
-        <div style={{position:'absolute',right:0,top:0,bottom:0,width:'38%',background:'rgba(200,220,240,.15)',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{color:'rgba(255,255,255,.22)',fontSize:9,fontFamily:'monospace'}}>patient photo</span></div>
-        <div style={{padding:'34px 28px',maxWidth:'62%'}}><h1 style={{color:'#fff',fontSize:23,fontWeight:900,lineHeight:1.22,margin:0,textTransform:'uppercase',letterSpacing:-.3}}>UNDERSTAND THE RISK<br/>OF YOUR HFrEF<br/>PATIENTS</h1></div>
-      </div>
-      <div style={{height:44,padding:'12px 20px',borderBottom:'1px solid #f5f5f5',display:'flex',alignItems:'center'}}><span style={{fontSize:13,color:'#333'}}>Dear {'{{Account.Name}}'},</span></div>
-      <div style={{height:44,padding:'12px 20px',borderBottom:'1px solid #f5f5f5',display:'flex',alignItems:'center'}}><span style={{fontSize:13,color:'#d1d5db',fontStyle:'italic'}}>{'{{customText}}'}</span></div>
-      <div style={{height:100,padding:'12px 20px',borderBottom:'1px solid #f5f5f5'}}>
-        <p style={{fontSize:13,lineHeight:1.65,color:'#1a1a1a',margin:0}}>Your HFrEF patients are living at risk, even those who appear stable.<sup style={{fontSize:8,verticalAlign:'super'}}>1,2</sup>{' '}Disease progression in HFrEF is often silent, meaning mild symptomatic status is very frequent and masks the serious nature of the disease.<sup style={{fontSize:8,verticalAlign:'super'}}>3</sup></p>
-      </div>
-      <div style={{height:210,padding:'16px 20px',background:'#fafafa',borderBottom:'1px solid #e8e8e8',display:'flex',gap:14}}>
-        <div style={{flex:1}}>
-          <p style={{fontSize:14,fontWeight:700,color:'#1a1a2e',lineHeight:1.3,margin:'0 0 8px'}}>Patients with HFrEF who seem stable can have more life with CARDIOMAX® vs ACEi<sup style={{fontSize:8,verticalAlign:'super'}}>4,5,6*</sup></p>
-          <p style={{fontSize:11,color:'#555',margin:'0 0 12px'}}>Reduces Risk of Death at 5 Years*</p>
-          <div style={{display:'flex',gap:8}}>
-            {[['23%','CV death reduction'],['18%','HF hospitalisations'],['21%','All-cause mortality']].map(([v,l])=>(
-              <div key={v} style={{background:'#fff',border:'1px solid #e0e0e0',borderRadius:6,padding:8,textAlign:'center',flex:1}}>
-                <div style={{fontSize:17,fontWeight:800,color:'#059669'}}>{v}</div>
-                <div style={{fontSize:9,color:'#777',lineHeight:1.3,marginTop:2}}>{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{width:155,background:'#fff',border:'1px solid #e0e0e0',borderRadius:6,padding:11,flexShrink:0}}>
-          <div style={{fontSize:11,fontWeight:800,color:'#1a1a2e',marginBottom:7,letterSpacing:.5}}>JAMES</div>
-          {[['Age','58'],['NYHA','II'],['Hospitalisations','1/yr'],['LVEF','32%'],['Medication','BB + VRA']].map(([k,v])=>(
-            <div key={k} style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:3}}><span style={{color:'#9ca3af'}}>{k}</span><span style={{fontWeight:600,color:'#333'}}>{v}</span></div>
-          ))}
-        </div>
-      </div>
-      <div style={{height:44,padding:'12px 20px',borderBottom:'1px solid #f5f5f5',display:'flex',alignItems:'center'}}><span style={{fontSize:12,color:'#d1d5db'}}>1,2</span></div>
-      <div style={{height:30,padding:'6px 20px',borderBottom:'1px solid #f0f0f0',display:'flex',alignItems:'center'}}><span style={{fontSize:10,fontWeight:800,color:'#555',textTransform:'uppercase',letterSpacing:.8}}>References</span></div>
-      <div style={{height:118,padding:'8px 20px',borderBottom:'1px solid #f0f0f0',overflow:'hidden'}}>
-        {['1. Ponikowski P et al. Eur Heart J. 2016;37:2129–2200.','2. Greene SJ et al. JAMA Cardiol. 2018;3:123–131.','3. Chioncel O et al. Eur J Heart Fail. 2017;19:1362–1369.','4. McMurray JJV et al. N Engl J Med. 2014;371:993–1004.','5. Jhund PS et al. Circulation. 2015;132:501–508.','6. Docherty KF et al. Eur Heart J. 2018;39:48–54.'].map((r,i)=>(
-          <div key={i} style={{fontSize:10,color:'#666',lineHeight:1.7}}>{r}</div>
-        ))}
-      </div>
-      <div style={{height:62,padding:'10px 20px',background:'#f7f7f7'}}><p style={{fontSize:9,color:'#888',lineHeight:1.55,margin:0}}>*This material is intended for healthcare professionals only. CARDIOMAX® is a registered trademark. Adverse events should be reported. © 2026 PharmaCo Ltd. All rights reserved. PP-CM-IE-0139.</p></div>
-    </div>
-  );
-}
-
-/* ── ANN RECT ───────────────────────────────────── */
-function AnnRect({id,type,sub,rect,sel,onSel,adding,label}){
-  const cfg=TC[type]||TC.BODY;
-  const bw=sel?2:1.5;
-  const glow=sel?`0 0 0 2px ${cfg.color}33`:'none';
-  return (
-    <div className={`ann-rect${sel?' sel':''}`}
-      style={{position:'absolute',top:rect.t,left:rect.l,width:rect.w,height:rect.h,
-        border:`${bw}px solid ${cfg.color}`,background:sel?`${cfg.color}09`:'transparent',
-        boxShadow:glow,zIndex:sel?20:5,pointerEvents:adding?'none':'auto',cursor:'pointer',borderRadius:1}}
-      onClick={e=>{e.stopPropagation();onSel(id);}}>
-      <span className="rl" style={{background:cfg.color}}>{label||sub||TC[type]?.short||type}</span>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════
-   DOCUMENT OUTLINE — top-to-bottom flow
-   Each node is a DocRow: type, text, children, refs, etc.
-═══════════════════════════════════════════════════════ */
-
-/* Inline ref chips */
-function RefChip({num,onClick}){
-  return (
-    <span onClick={e=>{e.stopPropagation();onClick&&onClick(num);}}
-      style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
-        width:16,height:16,borderRadius:3,background:G800+'18',
-        color:G800,fontSize:9,fontWeight:700,cursor:'pointer',
-        border:`1px solid ${G800}33`,marginLeft:2,verticalAlign:'middle',lineHeight:1,
-        transition:'background .12s'}}
-      title={`Reference ${num}`}>{num}</span>
-  );
-}
-
-/* Hover-checkbox component */
-function SelBox({checked,partial,onChange}){
-  const [hover,setHover]=useState(false);
-  const cls=`sel-check${checked?' checked':partial?' partial':''}`;
-  return (
-    <div className={cls}
-      style={{opacity:checked||hover?1:0,transition:'opacity .12s,border-color .12s,background .12s'}}
-      onMouseEnter={()=>setHover(true)}
-      onMouseLeave={()=>setHover(false)}
-      onClick={e=>{e.stopPropagation();onChange(!checked);}}>
-      {checked&&<svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-      {partial&&!checked&&<div style={{width:7,height:2,background:'#059669',borderRadius:1}}/>}
-    </div>
-  );
-}
-
-/* Image card — classification + thumb placeholder + OCR + description */
-function ImageCard({item,sel,onSel,checked,onCheck}){
-  const color = P300;
-  return (
-    <div onClick={()=>onSel(item.id)}
-      style={{border:`1.5px solid ${sel?P600:color+'66'}`,borderRadius:6,
-        background:sel?`${P300}12`:'#fafaf9',overflow:'hidden',cursor:'pointer',
-        transition:'border-color .14s,background .14s',marginBottom:1}}>
-      {/* top bar */}
-      <div style={{display:'flex',alignItems:'center',gap:6,padding:'6px 10px',borderBottom:`1px solid ${color}22`}}>
-        <SelBox checked={checked} onChange={onCheck}/>
-        <span style={{fontSize:9,fontWeight:700,color,textTransform:'uppercase',letterSpacing:.6}}>{item.sub||'Visual'}</span>
-        <span style={{fontSize:9,color:'#d1d5db',marginLeft:'auto'}}>{item.conf}%</span>
-        {item.status!=='accepted'&&<span style={{fontSize:9,color:P600,background:`${P600}12`,padding:'1px 5px',borderRadius:3,fontWeight:600}}>↗ {item.status}</span>}
-      </div>
-      <div style={{display:'flex',gap:0}}>
-        {/* thumb placeholder */}
-        <div style={{width:64,flexShrink:0,background:`${color}18`,display:'flex',alignItems:'center',
-          justifyContent:'center',minHeight:52,borderRight:`1px solid ${color}22`}}>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <rect x="2" y="4" width="18" height="14" rx="2" stroke={color} strokeWidth="1.4"/>
-            <circle cx="7.5" cy="9" r="1.5" fill={color}/>
-            <path d="M2 14l5-4 4 3 3-2.5 6 4" stroke={color} strokeWidth="1.2" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <div style={{flex:1,padding:'7px 10px',minWidth:0}}>
-          {/* description */}
-          <div style={{fontSize:12,color:'#333',lineHeight:1.45,marginBottom:4,fontWeight:500}}>{item.text}</div>
-          {/* OCR snippet */}
-          {item.ocr&&<div style={{fontSize:10,color:'#888',lineHeight:1.5,fontStyle:'italic',
-            background:'#f3f4f6',borderRadius:3,padding:'3px 6px',marginBottom:3}}>
-            <span style={{fontSize:9,fontWeight:600,color:'#d1d5db',textTransform:'uppercase',letterSpacing:.4,marginRight:4,fontStyle:'normal'}}>OCR</span>
-            {item.ocr}
-          </div>}
-          {/* adopted-from legal */}
-          {item.legal&&<div style={{fontSize:10,color:G800,lineHeight:1.45,marginTop:3,display:'flex',gap:4,alignItems:'flex-start'}}>
-            <span style={{fontSize:9,fontWeight:600,color:G400,textTransform:'uppercase',letterSpacing:.4,flexShrink:0,marginTop:1}}>Adopted</span>
-            <span>{item.legal}</span>
-          </div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* Single doc row — text-based elements */
-function DocRow({item,sel,onSel,depth=0,typeColor,typeLabel,dimmed,checked,onCheck,onAccept}){
-  const [hover,setHover]=useState(false);
-  const st=SC[item.status]||SC.edited;
-  const indent=depth*14;
-  return (
-    <div onClick={()=>onSel(item.id)}
-      onMouseEnter={()=>setHover(true)}
-      onMouseLeave={()=>setHover(false)}
-      style={{padding:`7px 12px 7px ${14+indent}px`,cursor:'pointer',
-        borderBottom:'1px solid #f3f4f6',position:'relative',
-        background:sel?`${typeColor}08`:checked?`${typeColor}06`:'transparent',
-        transition:'background .1s',opacity:dimmed?.55:1,display:'flex',gap:7,alignItems:'flex-start'}}>
-      {sel&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:2,background:typeColor,borderRadius:'0 1px 1px 0'}}/>}
-      {/* checkbox */}
-      <div style={{opacity:hover||checked?1:0,transition:'opacity .12s',paddingTop:depth>0?2:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-        <SelBox checked={checked} onChange={onCheck}/>
-      </div>
-      <div style={{flex:1,minWidth:0}}>
-      {/* type label */}
-      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:depth>0?2:4}}>
-        <span style={{fontSize:9,fontWeight:700,color:typeColor,textTransform:'uppercase',letterSpacing:.55}}>{typeLabel}</span>
-        {item.sub&&<span style={{fontSize:9,color:'#d1d5db',fontWeight:500}}>{item.sub}</span>}
-        {item.refs?.map(r=><RefChip key={r} num={r}/>)}
-        <span style={{marginLeft:'auto',fontSize:9,color:'#d1d5db'}}>{item.conf}%</span>
-        {item.status==='accepted'
-          ? <span style={{fontSize:9,color:P600,fontWeight:600,background:P300+'25',padding:'1px 5px',borderRadius:3}}>✓ accepted</span>
-          : <>
-            <span className="chip" style={{background:st.bg,color:st.c,fontSize:9}}>{st.l}</span>
-            {onAccept&&(
-              <button
-                style={{marginLeft:3,fontSize:11,padding:'2px 8px',fontWeight:600,
-                  border:`1.5px solid ${hover?P600:P300}`,borderRadius:4,
-                  color:hover?'#fff':P600,
-                  background:hover?P600:`${P300}30`,
-                  whiteSpace:'nowrap',cursor:'pointer',
-                  transition:'all .15s',fontFamily:'inherit',
-                  opacity:hover?1:0.55}}
-                onClick={e=>{e.stopPropagation();onAccept(item.id);}}
-                title="Accept">✓ Accept</button>
-            )}
-          </>}
-      </div>
-      {/* main text */}
-      <div style={{fontSize:depth>0?12:13,color:depth>0?'#555':'#222',
-        lineHeight:1.5,fontWeight:depth>0?400:item.bold?700:400,
-        wordBreak:'break-word'}}>
-        {item.text}
-      </div>
-      </div>{/* end inner */}
-    </div>
-  );
-}
-
-/* Claim block — headline + expandable assets */
-function ClaimBlock({claim,selId,onSel,onDelClaim,onAccClaim,onSelAsset,checked,onCheck,assetChecked,onAssetCheck}){
-  const [open,setOpen]=useState(true);
-  const isSel=selId===claim.id;
-  const st=SC[claim.status]||SC.edited;
-  return (
-    <div style={{borderBottom:'1px solid #e5e7eb',background:'#fff'}}>
-      {/* Claim header */}
-      <div onClick={()=>onSel(claim.id)}
-        style={{padding:'10px 12px 8px 14px',cursor:'pointer',position:'relative',
-          background:isSel?`${P800}07`:checked?`${P800}05`:'transparent',transition:'background .1s',
-          display:'flex',gap:7,alignItems:'flex-start'}}>
-        {isSel&&<div style={{position:'absolute',left:0,top:0,bottom:0,width:2,background:P800,borderRadius:'0 1px 1px 0'}}/>}
-        <div style={{paddingTop:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-          <SelBox checked={checked} onChange={onCheck}/>
-        </div>
-        <div style={{flex:1,minWidth:0}}>
-        {/* type label row */}
-        <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-          <span style={{fontSize:9,fontWeight:700,color:P800,textTransform:'uppercase',letterSpacing:.6}}>Claim</span>
-          <span style={{fontSize:10,color:'#d1d5db',fontWeight:500}}>{claim.name}</span>
-          {claim.refs?.map(r=><RefChip key={r} num={r}/>)}
-          <span style={{marginLeft:'auto',display:'flex',gap:4,alignItems:'center'}}>
-            <span style={{fontSize:9,color:'#d1d5db'}}>{claim.conf}%</span>
-            <span className="chip" style={{background:st.bg,color:st.c,fontSize:9}}>{st.l}</span>
-          </span>
-        </div>
-        {/* headline */}
-        <div style={{fontSize:13,fontWeight:700,color:'#1a1a1a',lineHeight:1.45,marginBottom:open?6:0}}>
-          {claim.headline}
-        </div>
-        {/* expand / actions */}
-        <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
-          <button className="btn-icon" style={{padding:'1px 4px',fontSize:10,color:'#d1d5db'}}
-            onClick={e=>{e.stopPropagation();setOpen(v=>!v);}}>
-            <span style={{display:'inline-block',transition:'transform .18s',transform:open?'rotate(90deg)':'none'}}>▶</span>
-            <span style={{marginLeft:3,fontSize:9}}>{claim.assets.length} assets</span>
-          </button>
-          <span style={{flex:1}}/>
-          <div style={{opacity:.4,display:'flex',gap:0}} onClick={e=>e.stopPropagation()}>
-            <Tip text="Accept"><button className="btn-icon g" onClick={()=>onAccClaim(claim.id)}>✓</button></Tip>
-            <Confirm text="Delete claim?" onConfirm={()=>onDelClaim(claim.id)}><button className="btn-icon r">✕</button></Confirm>
-          </div>
-        </div>
-        </div>{/* end inner */}
-      </div>
-      {/* Assets */}
-      {open&&(
-        <div style={{paddingLeft:20,paddingRight:12,paddingBottom:8,background:'#f9fafb'}}>
-          <div style={{fontSize:9,fontWeight:600,color:'#d1d5db',letterSpacing:.5,textTransform:'uppercase',padding:'6px 0 4px'}}>Supporting assets</div>
-          {claim.assets.map(a=>{
-            const asel=selId===a.id;
-            const ach=assetChecked?.(a.id)||false;
-            if(a.kind==='visual'){
-              return <ImageCard key={a.id} item={a} sel={asel} onSel={id=>onSelAsset(id,claim.id)}
-                checked={ach} onCheck={v=>onAssetCheck?.(a.id,v)}/>;
-            }
-            return (
-              <div key={a.id} onClick={e=>{e.stopPropagation();onSelAsset(a.id,claim.id);}}
-                style={{display:'flex',gap:7,padding:'5px 8px',borderRadius:4,cursor:'pointer',
-                  background:asel?`${P600}10`:ach?`${P600}07`:'transparent',
-                  border:`1px solid ${asel?P600+'55':'transparent'}`,
-                  marginBottom:2,transition:'background .1s',position:'relative'}}>
-                <div style={{flexShrink:0,marginTop:2}} onClick={e=>e.stopPropagation()}>
-                  <SelBox checked={ach} onChange={v=>onAssetCheck?.(a.id,v)}/>
-                </div>
-                <div style={{width:14,height:14,borderRadius:2,border:`1.5px solid ${P600}`,
-                  background:`${P600}15`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:2}}>
-                  <span style={{fontSize:8,color:P600,fontWeight:700}}>T</span>
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <span style={{fontSize:9,fontWeight:600,color:P600,textTransform:'uppercase',letterSpacing:.4,marginRight:5}}>text</span>
-                  <span style={{fontSize:12,color:'#444',lineHeight:1.45}}>{a.text}</span>
-                </div>
-                <span style={{fontSize:9,color:'#d1d5db',flexShrink:0,marginTop:2}}>{a.conf}%</span>
-              </div>
-            );
-          })}
-        </div>
+    <div ref={emailRef} style={{
+      flex:1, background:PALETTE.grey100, overflowY:'auto',
+      display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 20px 8px',
+    }}>
+      {!pages && (
+        <div style={{ color:PALETTE.grey500, fontSize:13, padding:40 }}>Loading preview…</div>
       )}
+      {pages && pages.pages.map(p => (
+        <PreviewPage
+          key={p.page}
+          page={p}
+          assetId={assetId}
+          dpi={pages.dpi}
+          zones={zonesByPage.get(p.page) || []}
+          hoveredZone={hoveredZone}
+          selectedZone={selectedZone}
+          onHover={onHover}
+          onSelect={onSelect}
+        />
+      ))}
+      <div style={{ marginTop:10, fontSize:11, color:PALETTE.grey400, textAlign:'center', lineHeight:1.6 }}>
+        Page render at {pages?.dpi || '—'} DPI · click a zone to cross-link with the X-Ray
+      </div>
     </div>
   );
-}
-
-/* ── OUTLINE GROUP ROW (collapsed summary) ─────────── */
-function OutlineGroupRow({label, color, count, open, onToggle, acceptedCount, onAcceptAll}){
-  const [hover,setHover]=useState(false);
-  const allAccepted = typeof acceptedCount==='number' && acceptedCount===count;
-  return (
-    <div onClick={onToggle}
-      onMouseEnter={()=>setHover(true)}
-      onMouseLeave={()=>setHover(false)}
-      style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',
-        borderBottom:'1px solid #f3f4f6',cursor:'pointer',transition:'background .1s',
-        background:hover?'#f9fafb':'transparent'}}>
-      <span style={{fontSize:10,color:color,transition:'transform .18s',display:'inline-block',
-        transform:open?'rotate(90deg)':'none',fontWeight:700}}>▶</span>
-      <span style={{fontSize:11,fontWeight:700,color,textTransform:'uppercase',letterSpacing:.5}}>{label}</span>
-      <span style={{fontSize:11,color:'#9ca3af',fontWeight:400}}>· {count} {count===1?'item':'items'}</span>
-      {typeof acceptedCount==='number'&&acceptedCount>0&&(
-        <span style={{fontSize:9,fontWeight:600,color:allAccepted?P600:'#9ca3af',
-          background:allAccepted?P300+'30':'#f3f4f6',
-          border:`1px solid ${allAccepted?P300:'#e5e7eb'}`,
-          padding:'1px 7px',borderRadius:10,marginLeft:2}}>
-          {allAccepted?'✓ all':''+acceptedCount+'/'+count}
-        </span>
-      )}
-      {!open&&<span style={{fontSize:9,fontWeight:700,color,background:color+'15',
-        border:`1px solid ${color}33`,padding:'1px 7px',borderRadius:10,marginLeft:2,letterSpacing:.4}}>COLLAPSED</span>}
-      <div style={{flex:1}}/>
-      {/* Quick accept all — visible on hover or when not all accepted */}
-      {onAcceptAll&&!allAccepted&&(
-        <button className="btn-icon g"
-          style={{opacity:hover?1:0,transition:'opacity .15s',fontSize:11,
-            padding:'2px 8px',border:`1px solid ${P300}`,borderRadius:4,
-            color:P600,background:'#f0fdf4',fontWeight:600,display:'flex',alignItems:'center',gap:3}}
-          onClick={e=>{e.stopPropagation();onAcceptAll();}}
-          title={`Accept all ${label}`}>
-          ✓ Accept all
-        </button>
-      )}
-      {allAccepted&&(
-        <span style={{fontSize:10,color:P600,fontWeight:600,opacity:.7}}>✓ done</span>
-      )}
-    </div>
-  );
-}
-
-/* ── THE FULL DOCUMENT OUTLINE (top-to-bottom) ───── */
-const REFS_DATA = {
-  '1':'Ponikowski P et al. Eur Heart J. 2016;37:2129.',
-  '2':'Greene SJ et al. JAMA Cardiol. 2018;3:123.',
-  '3':'Chioncel O et al. Eur J Heart Fail. 2017;19:1362.',
-  '4':'McMurray JJV et al. N Engl J Med. 2014;371:993.',
-  '5':'Jhund PS et al. Circulation. 2015;132:501.',
-  '6':'Docherty KF et al. Eur Heart J. 2018;39:48.',
 };
 
-function DocOutline({claims, other, selId, onSel, onSelAsset, onDelClaim, onAccClaim, onDelOther, onAccOther, checked, onCheck, viewMode, allCollapsed, onAccept, onAcceptAll}){
-  const [activeRef,setActiveRef]=useState(null);
-  const isGroup = viewMode==='type';
-  const ALL_KEYS={visuals:true,body:true,claims:true,references:true,regulatory:true};
-  const [groupOpen,setGroupOpen]=useState({...ALL_KEYS});
-  useEffect(()=>{
-    if(allCollapsed) setGroupOpen({visuals:false,body:false,claims:false,references:false,regulatory:false});
-    else setGroupOpen({...ALL_KEYS});
-  },[allCollapsed]);
-  const toggleGroup=key=>setGroupOpen(p=>({...p,[key]:!p[key]}));
-  const findOther=type=>other.filter(a=>a.type===type);
-
-  // Document sections in top-to-bottom order matching the email
-  const audRestr = findOther('AUD_RESTR');
-  const salutation = findOther('BODY').filter(a=>a.sub==='SALUTATION');
-  const bodyOther = findOther('BODY').filter(a=>a.sub!=='SALUTATION');
-  const visuals = findOther('DATA_VIS');
-  const refs = findOther('REFERENCE');
-  const regulatory = [...findOther('REGULATORY'),...findOther('LEGAL')];
+const PreviewPage = ({ page, assetId, dpi, zones, hoveredZone, selectedZone, onHover, onSelect }) => {
+  // Constrain the rendered page to a max display width while preserving aspect ratio.
+  // Overlay rectangles scale via the same width-based factor.
+  const MAX_DISPLAY_WIDTH = 600;
+  const scale = Math.min(1, MAX_DISPLAY_WIDTH / page.width_pt);
+  const displayWidth  = page.width_pt  * scale;
+  const displayHeight = page.height_pt * scale;
+  const pngUrl = `${BACKEND}/api/preview/${encodeURIComponent(assetId)}/page/${page.page}.png?dpi=${dpi}`;
 
   return (
-    <div style={{flex:1,overflow:'auto',fontSize:13}}>
-      {/* Ref popover */}
-      {activeRef&&(
-        <div style={{margin:'0 12px 0',background:'#f0fdf4',border:`1px solid ${P300}`,
-          borderRadius:6,padding:'8px 11px',display:'flex',alignItems:'flex-start',gap:8}}>
-          <span style={{fontSize:10,fontWeight:700,color:P800,flexShrink:0,marginTop:1}}>[{activeRef}]</span>
-          <span style={{fontSize:11,color:'#374151',lineHeight:1.5}}>{REFS_DATA[activeRef]||'—'}</span>
-          <button className="btn-icon" style={{marginLeft:'auto',flexShrink:0}} onClick={()=>setActiveRef(null)}>✕</button>
-        </div>
-      )}
-
-      {isGroup ? (
-        /* ═══ GROUP MODE — consolidated by type ═══ */
-        <>
-          {/* 1 · Claims */}
-          {claims.length>0&&<>
-            <OutlineGroupRow label="Claims" color={P800} count={claims.length} open={groupOpen.claims} onToggle={()=>toggleGroup('claims')} acceptedCount={claims.filter(c=>c.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('claims');}}/>
-            {groupOpen.claims&&<div style={{background:'#fafafa'}}>
-          {claims.map(c=>(
-            <ClaimBlock key={c.id} claim={c} selId={selId} onSel={onSel}
-              onDelClaim={onDelClaim} onAccClaim={onAccClaim} onSelAsset={onSelAsset}
-              checked={checked?.(c.id)} onCheck={v=>{onCheck?.(c.id,v);c.assets.forEach(a=>onCheck?.(a.id,v));}}
-              assetChecked={id=>checked?.(id)} onAssetCheck={(id,v)=>onCheck?.(id,v)}/>
-          ))}
-            </div>}
-          </>}
-          {/* 2 · Content */}
-          {(salutation.length+bodyOther.length)>0&&<>
-            <OutlineGroupRow label="Content" color={P600} count={salutation.length+bodyOther.length} open={groupOpen.body} onToggle={()=>toggleGroup('body')} acceptedCount={[...salutation,...bodyOther].filter(a=>a.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('content');}}/>
-            {groupOpen.body&&<>
-        {salutation.map(a=>(
-          <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={P600} typeLabel="Salutation"
-            checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)} onAccept={onAccept}/>
-        ))}
-        {bodyOther.map(a=>(
-          <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={P600} typeLabel="Content"
-            checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)} onAccept={onAccept}/>
-        ))}
-            </>}
-          </>}
-          {/* 3 · Regulatory (incl. Audience Restriction) */}
-          {(regulatory.length+audRestr.length)>0&&<>
-            <OutlineGroupRow label="Regulatory" color={G800} count={regulatory.length+audRestr.length} open={groupOpen.regulatory} onToggle={()=>toggleGroup('regulatory')} acceptedCount={[...regulatory,...audRestr].filter(a=>a.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('regulatory');}}/>
-            {groupOpen.regulatory&&<>
-        {audRestr.map(a=>(
-          <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={G800} typeLabel="Audience"
-            checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)}/>
-        ))}
-        {regulatory.map(a=>(
-          <div key={a.id} style={{borderBottom:'1px solid #f3f4f6',cursor:'pointer',
-            background:a.id===selId?`${G800}06`:checked?.(a.id)?`${G800}05`:'transparent',
-            display:'flex',gap:7,alignItems:'flex-start',padding:'8px 12px 8px 0'}} onClick={()=>onSel(a.id)}>
-            <div style={{padding:'0 0 0 12px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
-              <SelBox checked={checked?.(a.id)||false} onChange={c=>onCheck?.(a.id,c)}/>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:700,color:G800,textTransform:'uppercase',letterSpacing:.6}}>Regulatory</span>
-                <span style={{fontSize:9,color:'#d1d5db'}}>{a.conf}%</span>
-              </div>
-              <div style={{fontSize:11,color:G800,lineHeight:1.55}}>{a.fullText}</div>
-            </div>
-          </div>
-        ))}
-            </>}
-          </>}
-          {/* 4 · References */}
-          {refs.length>0&&<>
-            <OutlineGroupRow label="References" color={G800} count={refs.length} open={groupOpen.references} onToggle={()=>toggleGroup('references')} acceptedCount={refs.filter(a=>a.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('references');}}/>
-            {groupOpen.references&&<>
-        {refs.map(a=>(
-          <div key={a.id} style={{borderBottom:'1px solid #f3f4f6',cursor:'pointer',
-            background:a.id===selId?`${G800}06`:checked?.(a.id)?`${G800}05`:'transparent',
-            display:'flex',gap:7,alignItems:'flex-start'}} onClick={()=>onSel(a.id)}>
-            <div style={{padding:'7px 0 8px 12px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
-              <SelBox checked={checked?.(a.id)||false} onChange={c=>onCheck?.(a.id,c)}/>
-            </div>
-            <div style={{flex:1,padding:'7px 12px 8px 0'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:700,color:G800,textTransform:'uppercase',letterSpacing:.6}}>References</span>
-                <span style={{fontSize:9,color:'#d1d5db'}}>{a.conf}%</span>
-              </div>
-              {a.fullText.split('\n').map((line,i)=>(
-                <div key={i} style={{fontSize:11,color:'#555',lineHeight:1.75,display:'flex',gap:6}}>
-                  <span style={{color:G800,fontWeight:700,flexShrink:0,minWidth:12}}>{line.split('.')[0]}.</span>
-                  <span>{line.split('. ').slice(1).join('. ')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-            </>}
-          </>}
-          {/* 5 · Visuals */}
-          {visuals.length>0&&<>
-            <OutlineGroupRow label="Visuals" color={P300} count={visuals.length} open={groupOpen.visuals} onToggle={()=>toggleGroup('visuals')} acceptedCount={visuals.filter(v=>v.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('visuals');}}/>
-            {groupOpen.visuals&&<>
-        {visuals.filter(v=>v.sub==='LOGO'||v.sub==='BANNER').map(v=>(
-          <div key={v.id} style={{padding:'8px 12px',borderBottom:'1px solid #f3f4f6'}}>
-            <ImageCard item={{...v,ocr:v.sub==='LOGO'?'CARDIOMAX™ sacubitril/valsartan':undefined}}
-              sel={v.id===selId} onSel={onSel} checked={checked?.(v.id)} onCheck={c=>onCheck?.(v.id,c)}/>
-          </div>
-        ))}
-        {visuals.filter(v=>v.sub==='HERO').map(v=>(
-          <div key={v.id} style={{padding:'8px 12px',borderBottom:'1px solid #f3f4f6'}}>
-            <ImageCard item={{...v,ocr:'UNDERSTAND THE RISK OF YOUR HFrEF PATIENTS',
-              legal:'Promotional material for HCPs only. Not for patient distribution.'}}
-              sel={v.id===selId} onSel={onSel} checked={checked?.(v.id)} onCheck={c=>onCheck?.(v.id,c)}/>
-          </div>
-        ))}
-            </>}
-          </>}
-        </>
-      ) : (
-        /* ═══ ORDER MODE — document top-to-bottom ═══ */
-        <>
-          {/* Audience Restriction inline at top — labelled Regulatory */}
-          {audRestr.map(a=>(
-            <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={G800} typeLabel="Regulatory"
-              checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)} onAccept={onAccept}/>
-          ))}
-          {/* Visuals */}
-          {visuals.length>0&&<>
-            <OutlineGroupRow label="Visuals" color={P300} count={visuals.length} open={groupOpen.visuals} onToggle={()=>toggleGroup('visuals')}/>
-            {groupOpen.visuals&&<>
-        {visuals.filter(v=>v.sub==='LOGO'||v.sub==='BANNER').map(v=>(
-          <div key={v.id} style={{padding:'8px 12px',borderBottom:'1px solid #f3f4f6'}}>
-            <ImageCard item={{...v,ocr:v.sub==='LOGO'?'CARDIOMAX™ sacubitril/valsartan':undefined}}
-              sel={v.id===selId} onSel={onSel} checked={checked?.(v.id)} onCheck={c=>onCheck?.(v.id,c)}/>
-          </div>
-        ))}
-        {visuals.filter(v=>v.sub==='HERO').map(v=>(
-          <div key={v.id} style={{padding:'8px 12px',borderBottom:'1px solid #f3f4f6'}}>
-            <ImageCard item={{...v,ocr:'UNDERSTAND THE RISK OF YOUR HFrEF PATIENTS',
-              legal:'Promotional material for HCPs only. Not for patient distribution.'}}
-              sel={v.id===selId} onSel={onSel} checked={checked?.(v.id)} onCheck={c=>onCheck?.(v.id,c)}/>
-          </div>
-        ))}
-            </>}
-          </>}
-          {/* Content */}
-          {(salutation.length+bodyOther.length)>0&&<>
-            <OutlineGroupRow label="Content" color={P600} count={salutation.length+bodyOther.length} open={groupOpen.body} onToggle={()=>toggleGroup('body')}/>
-            {groupOpen.body&&<>
-        {salutation.map(a=>(
-          <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={P600} typeLabel="Salutation"
-            checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)} onAccept={onAccept}/>
-        ))}
-        {bodyOther.map(a=>(
-          <DocRow key={a.id} item={a} sel={a.id===selId} onSel={onSel} typeColor={P600} typeLabel="Content"
-            checked={checked?.(a.id)} onCheck={c=>onCheck?.(a.id,c)} onAccept={onAccept}/>
-        ))}
-            </>}
-          </>}
-          {/* Claims */}
-          {claims.length>0&&<>
-            <OutlineGroupRow label="Claims" color={P800} count={claims.length} open={groupOpen.claims} onToggle={()=>toggleGroup('claims')}/>
-            {groupOpen.claims&&<div style={{background:'#fafafa'}}>
-          {claims.map(c=>(
-            <ClaimBlock key={c.id} claim={c} selId={selId} onSel={onSel}
-              onDelClaim={onDelClaim} onAccClaim={onAccClaim} onSelAsset={onSelAsset}
-              checked={checked?.(c.id)} onCheck={v=>{onCheck?.(c.id,v);c.assets.forEach(a=>onCheck?.(a.id,v));}}
-              assetChecked={id=>checked?.(id)} onAssetCheck={(id,v)=>onCheck?.(id,v)}/>
-          ))}
-            </div>}
-          </>}
-          {/* References */}
-          {refs.length>0&&<>
-            <OutlineGroupRow label="References" color={G800} count={refs.length} open={groupOpen.references} onToggle={()=>toggleGroup('references')}/>
-            {groupOpen.references&&<>
-        {refs.map(a=>(
-          <div key={a.id} style={{borderBottom:'1px solid #f3f4f6',cursor:'pointer',
-            background:a.id===selId?`${G800}06`:checked?.(a.id)?`${G800}05`:'transparent',
-            display:'flex',gap:7,alignItems:'flex-start'}} onClick={()=>onSel(a.id)}>
-            <div style={{padding:'7px 0 8px 12px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
-              <SelBox checked={checked?.(a.id)||false} onChange={c=>onCheck?.(a.id,c)}/>
-            </div>
-            <div style={{flex:1,padding:'7px 12px 8px 0'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:700,color:G800,textTransform:'uppercase',letterSpacing:.6}}>References</span>
-                <span style={{fontSize:9,color:'#d1d5db'}}>{a.conf}%</span>
-              </div>
-              {a.fullText.split('\n').map((line,i)=>(
-                <div key={i} style={{fontSize:11,color:'#555',lineHeight:1.75,display:'flex',gap:6}}>
-                  <span style={{color:G800,fontWeight:700,flexShrink:0,minWidth:12}}>{line.split('.')[0]}.</span>
-                  <span>{line.split('. ').slice(1).join('. ')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-            </>}
-          </>}
-          {/* Regulatory footer */}
-          {regulatory.length>0&&<>
-            <OutlineGroupRow label="Regulatory" color={G800} count={regulatory.length} open={groupOpen.regulatory} onToggle={()=>toggleGroup('regulatory')} acceptedCount={regulatory.filter(a=>a.status==='accepted').length} onAcceptAll={()=>{onAcceptAll&&onAcceptAll('regulatory');}}/>
-            {groupOpen.regulatory&&<>
-        {regulatory.map(a=>(
-          <div key={a.id} style={{borderBottom:'1px solid #f3f4f6',cursor:'pointer',
-            background:a.id===selId?`${G800}06`:checked?.(a.id)?`${G800}05`:'transparent',
-            display:'flex',gap:7,alignItems:'flex-start',padding:'8px 12px 8px 0'}} onClick={()=>onSel(a.id)}>
-            <div style={{padding:'0 0 0 12px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
-              <SelBox checked={checked?.(a.id)||false} onChange={c=>onCheck?.(a.id,c)}/>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:700,color:G800,textTransform:'uppercase',letterSpacing:.6}}>Regulatory</span>
-                <span style={{fontSize:9,color:'#d1d5db'}}>{a.conf}%</span>
-              </div>
-              <div style={{fontSize:11,color:G800,lineHeight:1.55}}>{a.fullText}</div>
-            </div>
-          </div>
-        ))}
-            </>}
-          </>}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ── DETAIL PANEL ───────────────────────────────── */
-function DetailPanel({item,onBack,onSave,onDel,onAcc,onRerun,isClaim}){
-  const cfg=TC[item.type||'CLAIM']||TC.BODY;
-  const st=SC[item.status]||SC.edited;
-  const [et,setEt]=useState(item.fullText||item.headline||item.text||'');
-  const [dirty,setDirty]=useState(false);
-  useEffect(()=>{setEt(item.fullText||item.headline||item.text||'');setDirty(false);},[item.id]);
-  return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%'}}>
-      <div style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px',borderBottom:'1px solid #f3f4f6',flexShrink:0}}>
-        <button className="btn-icon" onClick={onBack} style={{fontSize:13,color:'#888',marginRight:2}}>←</button>
-        <div style={{width:9,height:9,borderRadius:2,background:cfg.color,flexShrink:0}}/>
-        <span style={{fontSize:12,fontWeight:700,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-          {isClaim?item.name:(TC[item.type]?.short||item.type)}
-        </span>
-        <span className="chip" style={{background:st.bg,color:st.c,flexShrink:0}}>{st.l}</span>
-      </div>
-      <div style={{flex:1,overflow:'auto',padding:'13px 14px'}}>
-        {isClaim&&<div style={{marginBottom:10}}>
-          <div className="sl">Claim name</div>
-          <div style={{fontSize:13,fontWeight:600,color:P800}}>{item.name}</div>
-        </div>}
-        <div style={{marginBottom:10}}>
-          <div className="sl">{isClaim?'Claim headline':'Extracted text'}</div>
-          <textarea rows={4} value={et} onChange={e=>{setEt(e.target.value);setDirty(true);}}/>
-        </div>
-        {item.refs?.length>0&&<div style={{marginBottom:10}}>
-          <div className="sl">References</div>
-          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {item.refs.map(r=><span key={r} className="chip" style={{background:'#ecfdf5',color:P800,border:`1px solid ${P300}`}}>Ref {r}</span>)}
-          </div>
-        </div>}
-        <div style={{marginBottom:10}}>
-          <div className="sl">Confidence</div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div className="confbar" style={{flex:1}}><div className="confbar-fill" style={{width:`${item.conf}%`,background:cc(item.conf)}}/></div>
-            <span style={{fontSize:11,fontWeight:700,color:cc(item.conf)}}>{item.conf}%</span>
-          </div>
-        </div>
-        {isClaim&&item.assets?.length>0&&<div style={{marginBottom:10}}>
-          <div className="sl">Supporting assets ({item.assets.length})</div>
-          {item.assets.map(a=>(
-            <div key={a.id} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 0',borderBottom:'1px solid #f5f5f5'}}>
-              <div style={{width:14,height:14,borderRadius:2,border:`1.5px solid ${a.kind==='visual'?P300:P600}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <span style={{fontSize:8,color:a.kind==='visual'?P300:P600}}>{a.kind==='visual'?'▣':'T'}</span>
-              </div>
-              <span style={{fontSize:11,color:'#555',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.text}</span>
-            </div>
-          ))}
-        </div>}
-      </div>
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',padding:'10px 12px',borderTop:'1px solid #f3f4f6',background:'#f9fafb',flexShrink:0}}>
-        {item.status!=='accepted'&&<button className="btn btn-accept" onClick={()=>onAcc(item.id)}>✓ Accept</button>}
-        {dirty&&<button className="btn btn-primary" onClick={()=>onSave(item.id,{fullText:et})}>Save</button>}
-        <button className="btn btn-ghost" onClick={()=>onRerun(item.id)}>↺ Rerun</button>
-        <Confirm text="Delete?" onConfirm={()=>onDel(item.id)}><button className="btn btn-danger">✕ Delete</button></Confirm>
-      </div>
-    </div>
-  );
-}
-
-/* ── STRUCTURED VIEW ────────────────────────────── */
-function StructuredView({claims,other}){
-  return (
-    <div className="md-wrap">
-      <div style={{fontSize:11,fontWeight:700,color:'#1a1a1a',marginBottom:2}}>entresto_ie_en_novartis-ie-crm-resp_139…</div>
-      <div style={{fontSize:10,color:'#9ca3af',fontFamily:'inherit',marginBottom:14}}>{claims.length} claims · {other.length} elements · Page 1/1</div>
-
-      {/* Claims */}
-      <div style={{marginBottom:14}}>
-        <div className="md-type-h" style={{color:P800,borderBottomColor:`${P800}22`}}>## CLAIMS ({claims.length})</div>
-        {claims.map(c=>(
-          <div key={c.id} style={{marginBottom:8}}>
-            <div className="md-item"><span style={{color:'#9ca3af',flexShrink:0}}>—</span><span style={{fontWeight:700,color:P800}}>{c.name}</span></div>
-            <div style={{marginLeft:16,fontSize:10.5,color:'#555',lineHeight:1.6,marginBottom:3}}>{c.headline}</div>
-            {c.assets.map(a=>(
-              <div key={a.id} style={{marginLeft:20}} className="md-item">
-                <span style={{color:'#d1d5db',flexShrink:0}}>·</span>
-                <span style={{fontSize:10,color:a.kind==='visual'?G400:P600,fontWeight:600,flexShrink:0}}>[{a.kind}]</span>
-                <span style={{fontSize:10.5,color:'#666'}}>{a.text}</span>
-              </div>
-            ))}
-            {c.refs?.length>0&&<div style={{marginLeft:16,display:'flex',gap:3,flexWrap:'wrap'}}>{c.refs.map(r=><RefChip key={r} num={r}/>)}</div>}
-          </div>
-        ))}
-      </div>
-
-      {/* Other grouped */}
-      {['AUD_RESTR','BODY','DATA_VIS','REFERENCE','REGULATORY','LEGAL'].map(type=>{
-        const items=other.filter(a=>a.type===type);
-        if(!items.length) return null;
-        const cfg=TC[type]||TC.BODY;
+    <div style={{
+      position:'relative', width:displayWidth, height:displayHeight,
+      background:PALETTE.white, marginBottom:16, borderRadius:4,
+      boxShadow:'0 4px 16px rgba(0,0,0,0.12)', overflow:'hidden',
+    }}>
+      <img
+        src={pngUrl}
+        alt={`${assetId} page ${page.page}`}
+        style={{ display:'block', width:'100%', height:'100%' }}
+        draggable={false}
+      />
+      {zones.map(z => {
+        const isHover = hoveredZone === z.id;
+        const isSelected = selectedZone === z.id;
+        const col = z.status === 'clean' ? PALETTE.primary600
+                  : z.status === 'attn'  ? PALETTE.warning600
+                                          : PALETTE.critical600;
+        const bg  = z.status === 'clean' ? PALETTE.primary100
+                  : z.status === 'attn'  ? PALETTE.warning100
+                                          : PALETTE.critical100;
+        const left   = z.bbox.x0 * scale;
+        const top    = z.bbox.y0 * scale;
+        const width  = (z.bbox.x1 - z.bbox.x0) * scale;
+        const height = (z.bbox.y1 - z.bbox.y0) * scale;
         return (
-          <div key={type} style={{marginBottom:12}}>
-            <div className="md-type-h" style={{color:cfg.color,borderBottomColor:`${cfg.color}22`}}>## {cfg.short} ({items.length})</div>
-            {items.map(a=>(
-              <div key={a.id}>
-                <div className="md-item"><span style={{color:'#d1d5db'}}>—</span>{a.sub&&<span style={{fontSize:9.5,color:'#9ca3af',flexShrink:0}}>[{a.sub}]</span>}<span style={{color:'#374151'}}>{a.text}</span></div>
-                {type==='REFERENCE'&&a.fullText?.includes('\n')&&a.fullText.split('\n').map((l,i)=><div key={i} className="md-ref">{l}</div>)}
-              </div>
-            ))}
+          <div
+            key={z.id}
+            onMouseEnter={() => onHover(z.id)}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => onSelect(z.id)}
+            style={{
+              position:'absolute', left, top, width, height,
+              border:`${isSelected ? 2 : 1}px solid ${col}`,
+              background: isHover || isSelected ? `${bg}80` : 'transparent',
+              cursor:'pointer', borderRadius:2,
+              transition:'background 0.12s, border-width 0.12s',
+            }}
+            title={z.label}
+          >
+            {z.pin != null && (
+              <div style={{
+                position:'absolute', top:-9, left:-9,
+                width:18, height:18, borderRadius:'50%',
+                background:col, color:PALETTE.white,
+                fontSize:10, fontWeight:700, display:'flex',
+                alignItems:'center', justifyContent:'center',
+                fontFamily:"'JetBrains Mono', monospace",
+              }}>{z.pin}</div>
+            )}
           </div>
         );
       })}
     </div>
   );
-}
+};
 
-/* ── ADD MODAL ──────────────────────────────────── */
-function AddModal({open,onOk,onCancel}){
-  const toast=useContext(TC2);
-  const [type,setType]=useState('CLAIM');
-  const [text,setText]=useState('');
-  const reset=()=>{setType('CLAIM');setText('');};
-  return (
-    <Modal open={open} title="Add annotation"
-      onOk={()=>{if(!text.trim()){toast('Enter extracted text','w');return;} onOk({type,text:text.trim()}); reset();}}
-      onCancel={()=>{reset();onCancel();}}>
-      <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        <div><div className="sl">Type</div><select value={type} onChange={e=>setType(e.target.value)}>{Object.keys(TC).map(k=><option key={k} value={k}>{TC[k].short}</option>)}</select></div>
-        <div><div className="sl">Extracted text</div><textarea rows={3} value={text} onChange={e=>setText(e.target.value)} placeholder="Paste or type the extracted content…"/></div>
-      </div>
-    </Modal>
-  );
-}
-
-/* ── PROGRESS BAR component ────────────────────────── */
-function ProgressBar({accepted, total}){
-  const pct = total>0 ? Math.round(accepted/total*100) : 0;
-  const allDone = accepted===total && total>0;
-  return (
-    <div style={{padding:'10px 14px 8px',borderBottom:'1px solid #f3f4f6',flexShrink:0}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-        <span style={{fontSize:11,fontWeight:600,color:allDone?P800:'#374151'}}>
-          {allDone ? '✓ All accepted' : `${accepted} of ${total} accepted`}
-        </span>
-        <span style={{fontSize:11,color:'#9ca3af',fontWeight:500}}>{pct}%</span>
-      </div>
-      <div style={{height:5,background:'#e5e7eb',borderRadius:3,overflow:'hidden'}}>
-        <div style={{
-          height:'100%',borderRadius:3,
-          background:allDone?P600:`linear-gradient(90deg,${P600},${P300})`,
-          width:`${pct}%`,transition:'width .4s cubic-bezier(.4,0,.2,1)'
-        }}/>
-      </div>
-    </div>
-  );
-}
-
-/* ── ASSET META CARD component ─────────────────────── */
-// Driven by props from the live backend payload. Falls back to a
-// "loading…" subtitle when meta is null.
-function AssetMetaCard({assetMeta, profileId, compliance}){
-  const [open,setOpen]=useState(true);
-  const fields = assetMeta ? [
-    {k:'Brand',     v:assetMeta.brand || '—'},
-    {k:'Market',    v:assetMeta.market || '—'},
-    {k:'Lang',      v:assetMeta.language || '—'},
-    {k:'Doc type',  v:assetMeta.doc_type || '—'},
-    {k:'Profile',   v:profileId || '—', full:true},
-    {k:'Code',      v:assetMeta.code || '—'},
-    {k:'Prepared',  v:assetMeta.prepared || '—'},
-  ] : [];
-  const subtitle = assetMeta
-    ? `${assetMeta.brand}${assetMeta.market ? ' · ' + assetMeta.market : ''}`
-    : 'loading…';
-
-  // Compliance summary — surfaces MLR Precheck findings as a side-channel
-  // row. Per design directive (option 2B), these don't get inline rows
-  // in the X-Ray outline; they live here.
-  const summary = compliance?.summary || {total:0,block:0,warn:0,info:0};
-  const findings = compliance?.findings || [];
-
-  return (
-    <div className="asset-meta-card">
-      <div className="amc-hdr" onClick={()=>setOpen(v=>!v)}>
-        <span style={{fontSize:10,color:'#9ca3af',transition:'transform .15s',display:'inline-block',transform:open?'rotate(90deg)':'none'}}>▶</span>
-        <span style={{fontSize:9,fontWeight:700,color:'#374151',textTransform:'uppercase',letterSpacing:.6}}>Asset</span>
-        <span style={{fontSize:11,color:'#6b7280',marginLeft:2}}>{subtitle}</span>
-        {summary.total > 0 && (
-          <span style={{
-            marginLeft:'auto', fontSize:10, fontWeight:600,
-            padding:'2px 7px', borderRadius:10,
-            color: summary.block > 0 ? '#dc2626' : summary.warn > 0 ? '#d97706' : '#059669',
-            background: summary.block > 0 ? '#fef2f2' : summary.warn > 0 ? '#fffbeb' : '#f0fdf4',
-            border: `1px solid ${summary.block > 0 ? '#fecaca' : summary.warn > 0 ? '#fde68a' : '#bbf7d0'}`,
-          }} title={findings.map(f => `[${f.severity}] ${f.label}`).join('\n')}>
-            MLR · {summary.block ? `${summary.block} block` : ''}{summary.block && summary.warn ? ' · ' : ''}{summary.warn ? `${summary.warn} warn` : ''}{!summary.block && !summary.warn ? `${summary.total} info` : ''}
-          </span>
-        )}
-      </div>
-      {open && fields.length > 0 && (
-        <div className="amc-body">
-          {fields.map(({k,v,full})=>(
-            <div key={k} className="amc-cell" style={full?{gridColumn:'1/-1',borderRight:'none'}:{}}>
-              <div className="meta-key">{k}</div>
-              <div className="meta-val">{v}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {open && findings.length > 0 && (
-        <div style={{borderTop:'1px solid #f3f4f6', padding:'7px 11px', background:'#fafafa', maxHeight:160, overflowY:'auto'}}>
-          <div style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:.6,marginBottom:5}}>
-            MLR Precheck findings
-          </div>
-          {findings.map((f,i)=>(
-            <div key={i} style={{fontSize:11,color:'#374151',padding:'3px 0',display:'flex',gap:6,alignItems:'flex-start'}}>
-              <span style={{
-                flexShrink:0,fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:3,
-                color: f.severity==='block' ? '#fff' : f.severity==='warn' ? '#92400e' : '#1e3a8a',
-                background: f.severity==='block' ? '#dc2626' : f.severity==='warn' ? '#fef3c7' : '#dbeafe',
-              }}>{f.severity.toUpperCase()}</span>
-              <span title={f.rationale}>{f.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── LEGEND ─────────────────────────────────────── */
-function Legend(){
-  const entries=[
-    {label:'Claim',color:P800},{label:'Content',color:P600},{label:'Visual',color:P300},{label:'Reg/Legal',color:G800}
-  ];
-  return (
-    <div style={{display:'flex',gap:10,alignItems:'center'}}>
-      {entries.map(({label,color})=>(
-        <div key={label} style={{display:'flex',alignItems:'center',gap:3}}>
-          <div style={{width:10,height:10,borderRadius:1,border:`1.5px solid ${color}`,background:'transparent',flexShrink:0}}/>
-          <span style={{fontSize:9,color:'#9ca3af'}}>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ── APP ─────────────────────────────────────────── */
-function App(){
-  const toast=useContext(TC2);
-  const [assetId,setAssetIdState]=useState(INITIAL_ASSET_ID);
-  const [assetList,setAssetList]=useState([]);
-  const [docHeight,setDocHeight]=useState(700);  // overlay container height; updated on fetch
-  const [compliance,setCompliance]=useState({findings:[], summary:{total:0,block:0,warn:0,info:0}});
-  const [meta,setMeta]=useState(null);
-  const [profileId,setProfileId]=useState(null);
-  const [loadError,setLoadError]=useState(null);
-
-  const [claims,setClaims]=useState(INIT_CLAIMS);
-  const [other,setOther]=useState(INIT_OTHER);
-  const [selId,setSelId]=useState(null);
-  const [selClaimId,setSelClaimId]=useState(null); // parent claim of selected asset
-  const [tab,setTab]=useState('xray');
-  const [scanning,setScanning]=useState(false);
-  const [adding,setAdding]=useState(false);
-  const [addModal,setAddModal]=useState(false);
-  const [rerunning,setRerunning]=useState(false);
-  const [checkedIds,setCheckedIds]=useState(new Set());
-  const [viewMode,setViewMode]=useState('reading'); // 'reading' | 'type'
-  const [allCollapsed,setAllCollapsed]=useState(false);
-  const pdfRef=useRef(null);
-
-  const setAssetId = useCallback(id => {
-    setAssetIdState(id);
-    const u = new URL(window.location); u.searchParams.set('asset', id);
-    window.history.replaceState({}, '', u);
-  }, []);
-
-  // Load asset directory once.
-  useEffect(()=>{
-    fetchAssetList().then(setAssetList).catch(()=>setAssetList([]));
-  },[]);
-
-  // Re-fetch document-xray + page metadata whenever assetId changes.
-  useEffect(()=>{
-    let cancelled = false;
-    setLoadError(null); setSelId(null); setSelClaimId(null); setCheckedIds(new Set());
-    Promise.all([fetchDocumentXray(assetId), fetchPages(assetId)])
-      .then(([payload, pages])=>{
-        if(cancelled) return;
-        const scaled = scaleRectsInPayload(payload, pages);
-        setClaims(scaled.claims || []);
-        setOther(scaled.elements || []);
-        setMeta(scaled.meta || null);
-        setProfileId(scaled.profile_id || null);
-        setCompliance({
-          findings: scaled.compliance_findings || [],
-          summary:  scaled.compliance_summary  || {total:0,block:0,warn:0,info:0},
-        });
-        setDocHeight(scaled._docHeight || 700);
-      })
-      .catch(e=>{ if(!cancelled) setLoadError(e); });
-    return ()=>{ cancelled = true; };
-  },[assetId]);
-
-  const toggleCheck=(id,val)=>setCheckedIds(p=>{const n=new Set(p);val?n.add(id):n.delete(id);return n;});
-  const isChecked=id=>checkedIds.has(id);
-  const checkedCount=checkedIds.size;
-
-  const acceptChecked=()=>{
-    const ids=[...checkedIds];
-    setClaims(p=>p.map(c=>ids.includes(c.id)?{...c,status:'accepted'}:{...c,assets:c.assets.map(a=>ids.includes(a.id)?{...a,status:'accepted'}:a)}));
-    setOther(p=>p.map(a=>ids.includes(a.id)?{...a,status:'accepted'}:a));
-    setCheckedIds(new Set());
-    toast(`${ids.length} item${ids.length>1?'s':''} accepted`,'s');
-  };
-  const deleteChecked=()=>{
-    const ids=new Set(checkedIds);
-    setClaims(p=>p.filter(c=>!ids.has(c.id)).map(c=>({...c,assets:c.assets.filter(a=>!ids.has(a.id))})));
-    setOther(p=>p.filter(a=>!ids.has(a.id)));
-    if(selId&&ids.has(selId))handleBack();
-    setCheckedIds(new Set());
-    toast(`${ids.size} item${ids.size>1?'s':''} deleted`);
-  };
-
-  const totalCount=claims.length+claims.reduce((s,c)=>s+c.assets.length,0)+other.length;
-  const acceptedCount=[...claims,...claims.flatMap(c=>c.assets),...other].filter(a=>a.status==='accepted').length;
-
-  // Find selected item across claims, assets, other
-  const findItem=useCallback(id=>{
-    const claim=claims.find(c=>c.id===id);
-    if(claim) return {item:claim,isClaim:true};
-    for(const c of claims){const a=c.assets.find(a=>a.id===id);if(a)return {item:a,isClaim:false,parentId:c.id};}
-    const o=other.find(a=>a.id===id);
-    if(o) return {item:o,isClaim:false};
-    return null;
-  },[claims,other]);
-
-  const handleSel=useCallback((id,parentId)=>{
-    if(selId===id){setSelId(null);setSelClaimId(null);return;}
-    setSelId(id);
-    setSelClaimId(parentId||null);
-    const found=findItem(id);
-    if(found?.item?.rect&&pdfRef.current) pdfRef.current.scrollTo({top:Math.max(0,found.item.rect.t-80),behavior:'smooth'});
-  },[selId,findItem]);
-
-  const handleBack=()=>{setSelId(null);setSelClaimId(null);};
-
-  const handleDelClaim=id=>{setClaims(p=>p.filter(c=>c.id!==id));if(selId===id)handleBack();toast('Claim deleted');};
-  const handleAccClaim=id=>{setClaims(p=>p.map(c=>c.id===id?{...c,status:'accepted'}:c));toast('Claim accepted','s');};
-  const handleDelOther=id=>{setOther(p=>p.filter(a=>a.id!==id));if(selId===id)handleBack();toast('Deleted');};
-  const handleAccOther=id=>{setOther(p=>p.map(a=>a.id===id?{...a,status:'accepted'}:a));toast('Accepted','s');};
-  const handleSave=(id,u)=>{
-    setClaims(p=>p.map(c=>c.id===id?{...c,...u}:c.assets.find(a=>a.id===id)?{...c,assets:c.assets.map(a=>a.id===id?{...a,...u}:a)}:c));
-    setOther(p=>p.map(a=>a.id===id?{...a,...u}:a));
-    toast('Saved','s');
-  };
-  const handleRerun=id=>{toast('Rerunning…','i');setTimeout(()=>toast('Updated','s'),1800);};
-  const accAll=()=>{
-    setClaims(p=>p.map(c=>({...c,status:'accepted',assets:c.assets.map(a=>({...a,status:'accepted'}))})));
-    setOther(p=>p.map(a=>({...a,status:'accepted'})));
-    handleBack(); toast('All accepted','s');
-  };
-  const rerunAll=()=>{
-    setRerunning(true);
-    setTimeout(()=>{setClaims(INIT_CLAIMS);setOther(INIT_OTHER);handleBack();setRerunning(false);toast('X-Ray complete','s');},2200);
-  };
-
-  const found=selId?findItem(selId):null;
-
-  // All rects to render
-  const allRects=[
-    ...claims.map(c=>({id:c.id,type:'CLAIM',sub:null,rect:c.rect,label:c.name})),
-    ...claims.flatMap(c=>c.assets.map(a=>({id:a.id,type:a.kind==='visual'?'DATA_VIS':'BODY',sub:a.kind,rect:a.rect,label:a.text.slice(0,28)}))),
-    ...other.map(a=>({id:a.id,type:a.type,sub:a.sub,rect:a.rect,label:a.text.slice(0,28)})),
-  ];
-
-  // Filter chips for xray tab
-  const chipGroups=[
-    {key:'ALL',label:`All ${totalCount}`,color:'#555'},
-    {key:'claim',label:`Claims ${claims.length}`,color:P800},
-    {key:'content',label:`Content ${other.filter(a=>a.type==='BODY').length}`,color:P600},
-    {key:'visual',label:`Visuals ${other.filter(a=>a.type==='DATA_VIS').length}`,color:P300},
-    {key:'legal',label:`Reg/Legal ${other.filter(a=>a.type==='REGULATORY'||a.type==='LEGAL'||a.type==='REFERENCE'||a.type==='AUD_RESTR').length}`,color:G800},
-  ];
-  const [chipFilter,setChipFilter]=useState('ALL');
-
-  // Document name for the header — prefer the brand+market combination, fall back to assetId.
-  const headerDocName = meta
-    ? (meta.code ? `${meta.brand} · ${meta.market} · ${meta.code}` : `${meta.brand} · ${meta.market}`)
-    : assetId;
-  const headerDocType = (meta?.doc_type || 'document').toUpperCase().replace('_', ' ');
-
-  // Library popover state — opens from the header's Library button.
-  const [libOpen, setLibOpen] = useState(false);
+// ─── APP ──────────────────────────────────────────────────────────────────────
+const App = () => {
+  const [assetId, setAssetId]       = useState(INITIAL_ASSET_ID);
+  const [assetList, setAssetList]   = useState([]);
+  const [asset, setAsset]           = useState(null);
+  const [error, setError]           = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [hoveredZone, setHoveredZone] = useState(null);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [libOpen, setLibOpen]       = useState(false);
   const libRef = useRef(null);
+  const emailRef = useRef(null);
+
+  // Click outside the Library popover dismisses it.
   useEffect(() => {
     if (!libOpen) return;
     const onDoc = e => {
@@ -1372,12 +405,105 @@ function App(){
     return () => document.removeEventListener('mousedown', onDoc);
   }, [libOpen]);
 
+  // Fetch the asset directory once on mount — drives the switcher.
+  useEffect(() => {
+    fetchAssetList().then(setAssetList).catch(() => setAssetList([]));
+  }, []);
+
+  // Fetch the precheck whenever assetId changes.
+  useEffect(() => {
+    let cancelled = false;
+    setAsset(null);
+    setError(null);
+    setHoveredZone(null);
+    setSelectedZone(null);
+    renderBannerStatus('connecting…');
+    fetchPrecheck(assetId)
+      .then(raw => {
+        if (cancelled) return;
+        const adapted = window.adaptBackendAsset(raw);
+        setAsset(adapted);
+        renderBannerStatus(
+          `<span class="ok">●</span> ${BACKEND} · ` +
+          `${raw.zones.length} zones · verdict ${raw.verdict} · score ${raw.scores.overall} · ` +
+          `library n=${raw.library.sample_size}`,
+          'ok',
+        );
+        // Reflect current asset in the URL so the page is shareable.
+        const url = new URL(window.location);
+        url.searchParams.set('asset', assetId);
+        window.history.replaceState({}, '', url);
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setError(e);
+        renderBannerStatus(
+          `<span class="err">●</span> ${BACKEND} unreachable: ${e.message}`,
+          'err',
+        );
+      });
+    return () => { cancelled = true; };
+  }, [assetId]);
+
+  // Asset switching now lives in the header's Library popover, not the
+  // backend debug banner. (Old picker-injection useEffect removed.)
+
+  // ── loading + error states ───────────────────────────────────────────────
+  if (error) {
+    return (
+      <div style={{
+        height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+        flexDirection:'column', gap:12, padding:40, textAlign:'center',
+      }}>
+        <div style={{ fontSize:24, fontWeight:600, color:PALETTE.critical600 }}>
+          Backend unreachable
+        </div>
+        <div style={{ fontSize:14, color:PALETTE.grey500, maxWidth:560 }}>
+          {error.message}
+        </div>
+        <div style={{ fontSize:12, color:PALETTE.grey400, fontFamily:'JetBrains Mono, monospace', marginTop:8 }}>
+          {error.code}
+        </div>
+        <div style={{ fontSize:13, color:PALETTE.grey700, marginTop:20, lineHeight:1.6 }}>
+          Start the backend: <code style={{
+            background:PALETTE.grey100, padding:'2px 8px', borderRadius:4,
+            fontFamily:'JetBrains Mono, monospace', fontSize:12,
+          }}>cd backend && uvicorn mlr.precheck.api:app --port 8088</code>
+        </div>
+      </div>
+    );
+  }
+
+  if (!asset) {
+    return (
+      <div style={{
+        height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+        gap:12, color:PALETTE.grey500, fontSize:14,
+      }}>
+        <div style={{
+          width:18, height:18, border:`2px solid ${PALETTE.primary200}`,
+          borderTopColor:PALETTE.primary500,
+          borderRadius:'50%', animation:'spin 0.8s linear infinite',
+        }}/>
+        Loading precheck for {assetId}…
+      </div>
+    );
+  }
+
+  // ── derived header values ──────────────────────────────────────────────
+  // Doc name: brand · market with optional code; reads from live meta.
+  const m = asset.meta;
+  const docName = m
+    ? (m.code ? `${m.brand} · ${m.market} · ${m.code}` : `${m.brand} · ${m.market}`)
+    : assetId;
+  const docType = (m?.doc_type || 'document').toUpperCase().replace('_', ' ');
+
   return (
-    <>
-      {/* ── SHAMAN MLR HEADER (apryse-designer style) ─────────────── */}
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+      {/* ── Shaman MLR X-Ray header (apryse-designer style + Frame 481) ── */}
       <div className="mlr-header">
         <div className="mlr-mark" title="Shaman">
-          {/* Same swirl glyph as apryse-designer/components/AppShell.tsx */}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="30" height="30" color="white">
             <g fill="currentColor"
                transform="matrix(0.65799867,0,0,0.65608171,5.499777,-0.08669466)"
@@ -1388,33 +514,32 @@ function App(){
           </svg>
         </div>
         <div className="mlr-name-block">
-          <span className="mlr-brand">Shaman Atlas</span>
-          <span className="mlr-dot">·</span>
-          <span className="mlr-title">MLR X-Ray</span>
-          <span className="mlr-doc" title={assetId}>{headerDocName}</span>
-          <span className="mlr-doctype">{headerDocType}</span>
+          <span className="mlr-brand">Shaman MLR X-Ray</span>
+          <span className="mlr-doc" title={assetId}>{docName}</span>
+          <span className="mlr-doctype">{docType}</span>
         </div>
 
         <div style={{flex:1}}/>
 
-        <div style={{display:'flex',alignItems:'center',gap:0,marginRight:6}}>
-          <span className="mlr-avatar"     title="Frances Smith">FS</span>
+        {/* Reviewer collab avatars */}
+        <div style={{display:'flex', alignItems:'center', marginRight:6}}>
+          <span className="mlr-avatar" title="Frances Smith">FS</span>
           <span className="mlr-avatar alt" title="Maurice van Leeuwen" style={{marginLeft:-6}}>ML</span>
         </div>
+
+        <button className="mlr-savebtn" onClick={()=>console.log('Save — coming soon')}>Save</button>
+
         <div ref={libRef} style={{position:'relative'}}>
-          <button className={`mlr-libbtn${libOpen ? ' open' : ''}`}
-            onClick={()=>setLibOpen(v => !v)}>
+          <button className={`mlr-libbtn${libOpen ? ' open' : ''}`} onClick={()=>setLibOpen(v=>!v)}>
             Library
             <span className="caret">▼</span>
           </button>
           {libOpen && (
             <div className="lib-pop">
-              <div className="lib-pop-hdr">
-                <span>Library · {assetList.length} asset{assetList.length === 1 ? '' : 's'}</span>
-              </div>
+              <div className="lib-pop-hdr">Library · {assetList.length} asset{assetList.length===1?'':'s'}</div>
               <div className="lib-pop-list">
                 {assetList.length === 0 && (
-                  <div style={{padding:'14px',fontSize:12,color:'#9ca3af',textAlign:'center'}}>
+                  <div style={{padding:14, fontSize:12, color:'#9ca3af', textAlign:'center'}}>
                     No assets available.
                   </div>
                 )}
@@ -1422,10 +547,10 @@ function App(){
                   <div key={a.asset_id}
                     className={`lib-pop-row${a.asset_id === assetId ? ' active' : ''}`}
                     onClick={() => { setAssetId(a.asset_id); setLibOpen(false); }}>
-                    <span className="badge">{(a.brand || '?').slice(0,2).toUpperCase()}</span>
+                    <span className="badge">{(a.brand||'?').slice(0,2).toUpperCase()}</span>
                     <span className="label">
                       <span className="brand">{a.brand || a.asset_id}</span>
-                      <span className="meta">{a.market || '—'} · {a.doc_type || '—'}{a.code ? ' · ' + a.code : ''}</span>
+                      <span className="meta">{a.market||'—'} · {a.doc_type||'—'}{a.code?' · '+a.code:''}</span>
                     </span>
                     {a.asset_id === assetId && <span className="check">✓</span>}
                   </div>
@@ -1434,178 +559,46 @@ function App(){
             </div>
           )}
         </div>
+
+        <span className="mlr-user-avatar" title="Signed-in user">JD</span>
       </div>
 
-      {/* ── TOOLBAR ──────────────────────────────── */}
-      {/* Asset name + switcher moved to the header's Library popover. */}
-      <div className="toolbar">
-        <div style={{display:'flex',alignItems:'center',gap:8,background:'#fff',border:'1px solid #e5e7eb',borderRadius:5,padding:'2px 9px'}}>
-          <span style={{fontSize:11,fontWeight:600,color:P600}}>{totalCount-acceptedCount} remaining</span>
-          <span style={{color:'#e5e7eb',fontSize:10}}>·</span>
-          <span style={{fontSize:11,color:'#888'}}>{acceptedCount} accepted</span>
-        </div>
-        <div style={{flex:1}}/>
-        <button className="btn btn-ghost"
-          onClick={()=>{setAdding(true);toast('Click document to place annotation','i');}}>+ Add</button>
-        <button className="btn btn-ghost" style={{gap:4}}
-          onClick={rerunAll} disabled={rerunning}>
-          <span className={rerunning?'spin':''} style={{display:'inline-block'}}>↺</span>
-          {rerunning?'Scanning…':'Re-scan'}
-        </button>
-        <button className="btn btn-primary" onClick={accAll}>✓ Accept all</button>
-      </div>
+      {/* Body */}
+      <div style={{ flex:1, display:'flex', overflow:'hidden', position:'relative' }}>
+        <PagedPreview
+          assetId={assetId}
+          asset={asset}
+          emailRef={emailRef}
+          hoveredZone={hoveredZone}
+          selectedZone={selectedZone}
+          onHover={setHoveredZone}
+          onSelect={setSelectedZone}
+        />
 
-      {/* ── MAIN ─────────────────────────────────── */}
-      <div className="main">
+        {drawerOpen && (
+          <Drawer asset={asset} role="reviewer" onClose={()=>setDrawerOpen(false)}
+            hoveredZone={hoveredZone} selectedZone={selectedZone}
+            onZoneHover={setHoveredZone} onZoneSelect={setSelectedZone} emailRef={emailRef}/>
+        )}
 
-        {/* PDF pane */}
-        <div ref={pdfRef} className="pdf-pane"
-          onClick={adding?()=>{setAdding(false);setAddModal(true);}:undefined}>
-          <div style={{maxWidth:760,margin:'0 auto'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-              <span style={{fontSize:10,color:'#9ca3af',fontFamily:'inherit'}}>Page 1/1</span>
-              <Legend/>
-            </div>
-            <div style={{position:'relative',boxShadow:'0 3px 20px rgba(0,0,0,.08)',borderRadius:2}}>
-              {adding&&<div className="add-ov"><span style={{fontSize:12,color:P600,fontWeight:600,background:'rgba(255,255,255,.96)',padding:'7px 13px',borderRadius:5,boxShadow:'0 2px 8px rgba(0,0,0,.1)'}}>Click to place annotation</span></div>}
-              <DocumentImage assetId={assetId} height={docHeight}/>
-              {allRects.map(r=><AnnRect key={r.id} {...r} sel={r.id===selId} onSel={handleSel} adding={adding}/>)}
-            </div>
+        {!drawerOpen && (
+          <div onClick={()=>setDrawerOpen(true)} style={{
+            position:'absolute', right:0, top:'50%', transform:'translateY(-50%)',
+            background:PALETTE.primary500, color:PALETTE.white, borderRadius:'6px 0 0 6px',
+            padding:'12px 5px', cursor:'pointer', writingMode:'vertical-rl',
+            fontSize:10, fontWeight:700, letterSpacing:0.8, textTransform:'uppercase',
+            display:'flex', alignItems:'center', gap:5,
+          }}>
+            <span className="material-icons" style={{ fontSize:13, transform:'rotate(90deg)', writingMode:'horizontal-tb' }}>science</span>
+            X-Ray
           </div>
-        </div>
-
-        {/* RIGHT PANEL */}
-        <div className="right-panel">
-          {/* Tabs + controls */}
-          <div style={{borderBottom:'1px solid #f3f4f6',flexShrink:0,display:'flex',alignItems:'center',padding:'0 6px 0 8px'}}>
-            {[['xray','X-Ray']].map(([t,l])=>(
-              <button key={t} className="tab-btn"
-                style={{fontWeight:tab===t?700:400,color:tab===t?P800:'#9ca3af',borderBottomColor:tab===t?P800:'transparent'}}
-                onClick={()=>{setTab(t);handleBack();}}>
-                {l}
-                {t==='xray'&&<span style={{fontSize:10,color:'#d1d5db',marginLeft:3,fontWeight:400}}>{totalCount}</span>}
-              </button>
-            ))}
-            <div style={{flex:1}}/>
-            {tab==='xray'&&(
-              <div style={{display:'flex',alignItems:'center',gap:4,paddingRight:4}}>
-                <button onClick={()=>setViewMode(v=>v==='reading'?'type':'reading')}
-                  style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 10px',
-                    border:'1px solid #e5e7eb',borderRadius:5,
-                    background:viewMode==='type'?'#ecfdf5':'#fff',
-                    fontSize:11,fontWeight:600,cursor:'pointer',
-                    color:viewMode==='type'?P800:'#6b7280',
-                    fontFamily:'inherit',whiteSpace:'nowrap',transition:'all .15s'}}>
-                  <span style={{fontSize:10}}>{viewMode==='reading'?'⇅':'⊞'}</span>
-                  {viewMode==='reading'?'Reading Order':'By Type'}
-                </button>
-                <button className="btn-icon" onClick={()=>setAllCollapsed(v=>!v)}
-                  style={{fontSize:11,padding:'2px 7px',fontWeight:600,
-                    color:allCollapsed?P600:'#9ca3af',
-                    border:allCollapsed?`1px solid ${P300}`:'1px solid #e5e7eb',
-                    borderRadius:5,background:'#fff'}}>
-                  {allCollapsed?'Expand':'Collapse'}
-                </button>
-                <Tip text="Re-scan">
-                  <button className="btn-icon" onClick={rerunAll}>
-                    <span className={rerunning?'spin':''} style={{display:'inline-block'}}>↺</span>
-                  </button>
-                </Tip>
-              </div>
-            )}
-
-          </div>
-
-          {/* X-RAY TAB */}
-          {tab==='xray'&&(
-            <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
-              {/* Filter chips */}
-              <div style={{display:'flex',gap:5,padding:'7px 10px 6px',overflowX:'auto',borderBottom:'1px solid #f3f4f6',flexShrink:0}}>
-                {chipGroups.map(({key,label,color})=>(
-                  <button key={key} className={`fchip${chipFilter===key?' active':''}`}
-                    style={{color}} onClick={()=>setChipFilter(chipFilter===key&&key!=='ALL'?'ALL':key)}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {/* Progress bar */}
-              <ProgressBar accepted={acceptedCount} total={totalCount}/>
-              {/* Asset metadata card */}
-              <AssetMetaCard assetMeta={meta} profileId={profileId} compliance={compliance}/>
-              {/* Document outline — top-to-bottom flow */}
-              <DocOutline
-                claims={chipFilter==='ALL'||chipFilter==='claim' ? claims : []}
-                other={other.filter(a=>{
-                  if(chipFilter==='ALL') return true;
-                  if(chipFilter==='content') return a.type==='BODY';
-                  if(chipFilter==='visual') return a.type==='DATA_VIS';
-                  if(chipFilter==='legal') return a.type==='REGULATORY'||a.type==='LEGAL'||a.type==='REFERENCE'||a.type==='AUD_RESTR';
-                  return true;
-                })}
-                selId={selId}
-                onSel={handleSel}
-                onSelAsset={(aid,cid)=>handleSel(aid,cid)}
-                onDelClaim={handleDelClaim}
-                onAccClaim={handleAccClaim}
-                onDelOther={handleDelOther}
-                onAccOther={handleAccOther}
-                checked={isChecked}
-                onCheck={toggleCheck}
-                viewMode={viewMode}
-                allCollapsed={allCollapsed}
-                onAccept={id=>{handleAccOther(id);}}
-                onAcceptAll={group=>{
-                  if(group==='claims'){setClaims(p=>p.map(c=>({...c,status:'accepted',assets:c.assets.map(a=>({...a,status:'accepted'}))})));toast('All claims accepted','s');}
-                  else if(group==='content'){setOther(p=>p.map(a=>a.type==='BODY'?{...a,status:'accepted'}:a));toast('All content accepted','s');}
-                  else if(group==='regulatory'){setOther(p=>p.map(a=>(a.type==='REGULATORY'||a.type==='LEGAL'||a.type==='AUD_RESTR')?{...a,status:'accepted'}:a));toast('All regulatory accepted','s');}
-                  else if(group==='references'){setOther(p=>p.map(a=>a.type==='REFERENCE'?{...a,status:'accepted'}:a));toast('All references accepted','s');}
-                  else if(group==='visuals'){setOther(p=>p.map(a=>a.type==='DATA_VIS'?{...a,status:'accepted'}:a));toast('All visuals accepted','s');}
-                }}
-              />
-              {/* Floating bulk action bar */}
-              {checkedCount>0&&(
-                <div className="bulk-bar">
-                  <span style={{fontSize:12,fontWeight:600,color:'#fff'}}>{checkedCount} selected</span>
-                  <div style={{flex:1}}/>
-                  <button className="btn" style={{background:'#059669',color:'#fff',border:'none',fontSize:12,padding:'5px 12px'}}
-                    onClick={acceptChecked}>✓ Accept {checkedCount}</button>
-                  <button className="btn" style={{background:'#dc2626',color:'#fff',border:'none',fontSize:12,padding:'5px 12px'}}
-                    onClick={deleteChecked}>✕ Delete</button>
-                  <button className="btn-icon" style={{color:'#888',fontSize:14,marginLeft:2}}
-                    onClick={()=>setCheckedIds(new Set())}>✕</button>
-                </div>
-              )}
-              {/* Detail slide */}
-              <div className={`panel-view${found?' vis':''}`}>
-                {found&&<DetailPanel item={found.item} isClaim={found.isClaim} onBack={handleBack} onSave={handleSave} onDel={found.isClaim?handleDelClaim:handleDelOther} onAcc={found.isClaim?handleAccClaim:handleAccOther} onRerun={handleRerun}/>}
-              </div>
-            </div>
-          )}
-
-
-
-
-        </div>
+        )}
       </div>
-
-      {/* ── BOTTOM BAR removed per design direction ────────────────────
-         Was: "Use structured output →" with Compile / Repurpose / Compare
-         stub buttons + a counts summary. The buttons were toast-only
-         placeholders (downstream workflow entry points, not in scope
-         for the precheck POC). Removed to reduce visual noise.        */}
-
-      <AddModal open={addModal} onOk={({type,text})=>{
-        const id='a'+Date.now();
-        setOther(p=>[...p,{id,type,sub:null,conf:80,status:'new',text,fullText:text,refs:[],rect:{t:440,l:5,w:300,h:50}}]);
-        setAddModal(false); toast('Annotation added','s');
-      }} onCancel={()=>setAddModal(false)}/>
-
-      <style>{`@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}`}</style>
-    </>
+    </div>
   );
-}
+};
 
-ReactDOM.createRoot(document.getElementById('root')).render(<ToastProvider><App/></ToastProvider>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>

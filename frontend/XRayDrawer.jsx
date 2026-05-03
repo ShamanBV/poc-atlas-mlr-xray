@@ -457,12 +457,16 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
         padding:'11px 14px 10px',flexShrink:0 }}>
         <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8 }}>
           <div style={{ minWidth:0 }}>
-            <div className="mono" style={{ fontSize:9,color:C.grey300,marginBottom:4,
-              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{asset.identity}</div>
+            <div style={{ fontSize:10,fontWeight:700,color:C.grey400,
+              textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2 }}>Total score</div>
             <div style={{ display:'flex',alignItems:'baseline',gap:6 }}>
               <span style={{ fontSize:42,fontWeight:700,color:scoreColor(asset.scores.overall),
                 fontVariantNumeric:'tabular-nums',lineHeight:1 }}>{asset.scores.overall}</span>
               <span style={{ fontSize:12,color:C.grey300,paddingBottom:2 }}>/100</span>
+            </div>
+            <div className="mono" style={{ fontSize:9,color:C.grey300,marginTop:6,
+              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:280 }}>
+              {asset.identity}
             </div>
           </div>
           <div style={{ display:'flex',gap:6,alignItems:'center',flexShrink:0 }}>
