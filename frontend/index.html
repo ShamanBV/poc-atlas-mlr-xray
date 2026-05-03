@@ -1489,27 +1489,23 @@ function App(){
             <div style={{flex:1}}/>
             {tab==='xray'&&(
               <div style={{display:'flex',alignItems:'center',gap:4,paddingRight:4}}>
-                <Tip text={viewMode==='reading'?'Switch to By Type view':'Switch to Reading Order view'}>
-                  <button onClick={()=>setViewMode(v=>v==='reading'?'type':'reading')}
-                    style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 10px',
-                      border:'1px solid #e5e7eb',borderRadius:5,
-                      background:viewMode==='type'?'#ecfdf5':'#fff',
-                      fontSize:11,fontWeight:600,cursor:'pointer',
-                      color:viewMode==='type'?P800:'#6b7280',
-                      fontFamily:'inherit',whiteSpace:'nowrap',transition:'all .15s'}}>
-                    <span style={{fontSize:10}}>{viewMode==='reading'?'⇅':'⊞'}</span>
-                    {viewMode==='reading'?'Reading Order':'By Type'}
-                  </button>
-                </Tip>
-                <Tip text={allCollapsed?"Expand all":"Collapse all"}>
-                  <button className="btn-icon" onClick={()=>setAllCollapsed(v=>!v)}
-                    style={{fontSize:11,padding:'2px 7px',fontWeight:600,
-                      color:allCollapsed?P600:'#9ca3af',
-                      border:allCollapsed?`1px solid ${P300}`:'1px solid #e5e7eb',
-                      borderRadius:5,background:'#fff'}}>
-                    {allCollapsed?'Expand':'Collapse'}
-                  </button>
-                </Tip>
+                <button onClick={()=>setViewMode(v=>v==='reading'?'type':'reading')}
+                  style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 10px',
+                    border:'1px solid #e5e7eb',borderRadius:5,
+                    background:viewMode==='type'?'#ecfdf5':'#fff',
+                    fontSize:11,fontWeight:600,cursor:'pointer',
+                    color:viewMode==='type'?P800:'#6b7280',
+                    fontFamily:'inherit',whiteSpace:'nowrap',transition:'all .15s'}}>
+                  <span style={{fontSize:10}}>{viewMode==='reading'?'⇅':'⊞'}</span>
+                  {viewMode==='reading'?'Reading Order':'By Type'}
+                </button>
+                <button className="btn-icon" onClick={()=>setAllCollapsed(v=>!v)}
+                  style={{fontSize:11,padding:'2px 7px',fontWeight:600,
+                    color:allCollapsed?P600:'#9ca3af',
+                    border:allCollapsed?`1px solid ${P300}`:'1px solid #e5e7eb',
+                    borderRadius:5,background:'#fff'}}>
+                  {allCollapsed?'Expand':'Collapse'}
+                </button>
                 <Tip text="Re-scan">
                   <button className="btn-icon" onClick={rerunAll}>
                     <span className={rerunning?'spin':''} style={{display:'inline-block'}}>↺</span>
