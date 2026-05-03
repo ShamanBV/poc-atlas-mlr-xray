@@ -29,18 +29,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sa
 .sh-navbtn:hover{background:rgba(5,150,105,.12);}
 .sh-avatar{width:26px;height:26px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;margin-left:8px;cursor:pointer;}
 
-/* ── SHAMAN MLR HEADER ─────────────────── */
-.mlr-header{height:48px;display:flex;align-items:center;gap:10px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
-.mlr-mark{width:36px;height:36px;border-radius:6px;background:#065f46;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 3px rgba(6,95,70,.25);}
-.mlr-title{font-size:14px;font-weight:700;color:#065f46;letter-spacing:-.2px;white-space:nowrap;}
-.mlr-sep{width:1px;height:20px;background:#e5e7eb;}
-.mlr-doc{font-size:12px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;}
-.mlr-doctype{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#047857;background:#d1fae5;border:1px solid #a7f3d0;padding:2px 7px;border-radius:10px;}
-.mlr-avatar{width:28px;height:28px;border-radius:50%;background:#374151;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.3px;flex-shrink:0;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px #e5e7eb;transition:transform .12s;}
+/* ── SHAMAN MLR HEADER (matches apryse-designer AppShell style) ─────── */
+/* Tokens (mirroring apryse-designer/app/globals.css):
+     --shaman-green-50:  #E5F6EE
+     --shaman-green-600: #00A66F
+     --shaman-grey-50:   #EFEFEF
+     --shaman-grey-200:  #BDBDBD
+     --shaman-grey-500:  #6F7E7F
+*/
+.mlr-header{height:48px;display:flex;align-items:center;flex-shrink:0;background:#E5F6EE;border-bottom:1px solid #EFEFEF;}
+.mlr-mark{width:48px;height:48px;background:#00A66F;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none;}
+.mlr-name-block{display:flex;align-items:center;gap:8px;padding:0 16px;}
+.mlr-brand{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#00A66F;}
+.mlr-dot{color:#BDBDBD;font-size:13px;}
+.mlr-title{font-size:14px;font-weight:700;color:#00A66F;white-space:nowrap;}
+.mlr-doc{font-size:12px;font-weight:500;color:#6F7E7F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;margin-left:6px;}
+.mlr-doctype{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#00A66F;background:#fff;border:1px solid #C1E8D6;padding:2px 7px;border-radius:10px;}
+.mlr-avatar{width:28px;height:28px;border-radius:50%;background:#6F7E7F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.3px;flex-shrink:0;cursor:pointer;border:2px solid #E5F6EE;box-shadow:0 0 0 1px #BDBDBD;transition:transform .12s;}
 .mlr-avatar:hover{transform:translateY(-1px);}
-.mlr-avatar.alt{background:#065f46;}
-.mlr-libbtn{font-size:11px;font-weight:600;color:#065f46;background:#fff;border:1px solid #6ee7b7;border-radius:5px;padding:5px 12px;cursor:pointer;transition:all .14s;font-family:inherit;}
-.mlr-libbtn:hover{background:#f0fdf4;}
+.mlr-avatar.alt{background:#00A66F;}
+.mlr-libbtn{font-size:13px;font-weight:500;color:#323232;background:#fff;border:1px solid #BDBDBD;border-radius:6px;padding:5px 14px;cursor:pointer;transition:all .14s;font-family:inherit;margin-left:12px;margin-right:14px;}
+.mlr-libbtn:hover{background:#E5F6EE;border-color:#00A66F;color:#00A66F;}
 
 /* ── TOOLBAR ───────────────────────────── */
 .toolbar{height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
@@ -1336,18 +1345,26 @@ function App(){
 
   return (
     <>
-      {/* ── SHAMAN MLR HEADER ────────────────────── */}
+      {/* ── SHAMAN MLR HEADER (apryse-designer style) ─────────────── */}
       <div className="mlr-header">
-        <div className="mlr-mark">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M16 6c0-2.2-1.8-4-4-4H10C7.8 2 6 3.8 6 6c0 2.2 1.8 4 4 4h4c2.2 0 4 1.8 4 4 0 2.2-1.8 4-4 4h-4c-2.2 0-4-1.8-4-4"
-              stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+        <div className="mlr-mark" title="Shaman">
+          {/* Same swirl glyph as apryse-designer/components/AppShell.tsx */}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="30" height="30" color="white">
+            <g fill="currentColor"
+               transform="matrix(0.65799867,0,0,0.65608171,5.499777,-0.08669466)"
+               style={{fillRule:'nonzero'}}>
+              <path d="m 20.945,30.624 c 0.046,0.002 0.092,0.002 0.138,0 0.877,0 1.621,-0.337 1.698,-1.24 a 14.2,14.2 0 0 1 0.557,-3.03 3.972,3.972 0 0 1 -3.298,-0.833 17.533,17.533 0 0 0 -0.653,3.596 c -0.077,0.945 0.621,1.433 1.558,1.507 z M 25.41,22.33 c -0.002,-1.588 -1.272,-2.874 -2.838,-2.873 -1.565,0 -2.834,1.288 -2.834,2.875 0,1.587 1.269,2.874 2.834,2.875 1.567,0 2.837,-1.289 2.837,-2.878 z"/>
+              <path d="m 15.747,47.482 c 0.442,-3.227 2.813,-5.688 4.579,-8.181 2.295,-3.245 4.44,-7.598 4.194,-11.808 a 87.859,87.859 0 0 0 -0.098,-1.522 c -0.105,0.055 -0.21,0.106 -0.319,0.151 -0.05,0.38 -0.11,0.824 -0.188,1.269 -0.36,2.06 -2.722,5.91 -4.361,8.247 -2.291,3.252 -4.45,6.322 -4.423,11.803 0,0.002 0.174,3.269 0.616,0.041 z M 26.552,14.247 c 0.174,0.58 0.775,0.909 1.348,0.738 l 1.38,-0.417 a 1.1,1.1 0 0 0 0.726,-1.367 L 28.724,2.049 c 0,-0.017 -0.014,-0.032 -0.02,-0.05 A 1.683,1.683 0 0 0 28.655,1.776 C 28.244,0.377 26.239,-0.25 24.176,0.373 22.14,0.991 20.813,2.601 21.18,3.99 c -0.004,0.113 0.01,0.226 0.042,0.335 l 5.33,9.923 z M 18.705,1.722 A 2.105,2.105 0 0 0 18.55,1.472 c -1.091,-1.521 -3.583,-1.566 -5.56,-0.104 -1.957,1.448 -2.682,3.825 -1.637,5.346 0.046,0.137 0.112,0.266 0.194,0.383 l 10.39,9.932 c 0.454,0.63 1.27,0.812 1.819,0.406 l 1.325,-0.979 c 0.548,-0.404 0.626,-1.25 0.175,-1.878 L 18.75,1.773 A 0.443,0.443 0 0 0 18.706,1.722 Z M 9.872,7.256 A 2.554,2.554 0 0 0 9.635,7.063 C 8.051,5.934 5.627,6.665 4.22,8.7 2.828,10.709 2.954,13.232 4.481,14.379 a 1.7,1.7 0 0 0 0.323,0.31 L 18.3,21.045 c 0.116,0.081 0.243,0.147 0.375,0.195 a 4.082,4.082 0 0 1 2.589,-2.79 1.615,1.615 0 0 0 -0.603,-0.81 L 9.934,7.293 A 0.547,0.547 0 0 1 9.872,7.256 Z m 20.444,8.354 c -1.588,0.307 -3.868,1.245 -5.941,3.055 a 4.095,4.095 0 0 1 2.12,2.683 10.447,10.447 0 0 1 4.45,-2.348 c 0.914,-0.177 1.128,-1.278 0.867,-2.19 -0.27,-0.963 -0.793,-1.334 -1.496,-1.2 z M 6.026,34.405 c 0.108,0.028 0.22,0.039 0.33,0.031 l 10.7,-3.16 a 1.094,1.094 0 0 0 0.999,-1.177 l -0.109,-1.457 a 1.089,1.089 0 0 0 -1.16,-1.013 L 5.768,26.52 a 0.423,0.423 0 0 0 -0.051,0.009 1.645,1.645 0 0 0 -0.227,0 c -1.437,0.108 -2.469,1.96 -2.306,4.135 0.157,2.151 1.425,3.81 2.842,3.742 z M 0.232,19.39 c -0.677,2.358 0.18,4.688 1.917,5.252 0.121,0.079 0.253,0.14 0.391,0.184 l 14.21,1.442 c 0.736,0.218 1.495,-0.143 1.685,-0.804 L 18.87,23.958 A 4.113,4.113 0 0 1 18.552,22.661 1.505,1.505 0 0 0 17.899,22.272 L 5.04,16.146 A 0.62,0.62 0 0 0 4.971,16.134 2.813,2.813 0 0 0 4.701,16.031 c -1.782,-0.526 -3.78,0.977 -4.469,3.36 z"/>
+            </g>
           </svg>
         </div>
-        <span className="mlr-title">Shaman MLR X-Ray</span>
-        <span className="mlr-sep"/>
-        <span className="mlr-doc" title={assetId}>{headerDocName}</span>
-        <span className="mlr-doctype">{headerDocType}</span>
+        <div className="mlr-name-block">
+          <span className="mlr-brand">Shaman Atlas</span>
+          <span className="mlr-dot">·</span>
+          <span className="mlr-title">MLR X-Ray</span>
+          <span className="mlr-doc" title={assetId}>{headerDocName}</span>
+          <span className="mlr-doctype">{headerDocType}</span>
+        </div>
 
         <div style={{flex:1}}/>
 
