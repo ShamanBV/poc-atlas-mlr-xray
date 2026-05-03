@@ -29,6 +29,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sa
 .sh-navbtn:hover{background:rgba(5,150,105,.12);}
 .sh-avatar{width:26px;height:26px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;margin-left:8px;cursor:pointer;}
 
+/* ── SHAMAN MLR HEADER ─────────────────── */
+.mlr-header{height:48px;display:flex;align-items:center;gap:10px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
+.mlr-mark{width:36px;height:36px;border-radius:6px;background:#065f46;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 3px rgba(6,95,70,.25);}
+.mlr-title{font-size:14px;font-weight:700;color:#065f46;letter-spacing:-.2px;white-space:nowrap;}
+.mlr-sep{width:1px;height:20px;background:#e5e7eb;}
+.mlr-doc{font-size:12px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;}
+.mlr-doctype{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#047857;background:#d1fae5;border:1px solid #a7f3d0;padding:2px 7px;border-radius:10px;}
+.mlr-avatar{width:28px;height:28px;border-radius:50%;background:#374151;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.3px;flex-shrink:0;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px #e5e7eb;transition:transform .12s;}
+.mlr-avatar:hover{transform:translateY(-1px);}
+.mlr-avatar.alt{background:#065f46;}
+.mlr-libbtn{font-size:11px;font-weight:600;color:#065f46;background:#fff;border:1px solid #6ee7b7;border-radius:5px;padding:5px 12px;cursor:pointer;transition:all .14s;font-family:inherit;}
+.mlr-libbtn:hover{background:#f0fdf4;}
+
 /* ── TOOLBAR ───────────────────────────── */
 .toolbar{height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;flex-shrink:0;background:#fff;border-bottom:1px solid #e5e7eb;}
 
@@ -1315,8 +1328,36 @@ function App(){
   ];
   const [chipFilter,setChipFilter]=useState('ALL');
 
+  // Document name for the header — prefer the brand+market combination, fall back to assetId.
+  const headerDocName = meta
+    ? (meta.code ? `${meta.brand} · ${meta.market} · ${meta.code}` : `${meta.brand} · ${meta.market}`)
+    : assetId;
+  const headerDocType = (meta?.doc_type || 'document').toUpperCase().replace('_', ' ');
+
   return (
     <>
+      {/* ── SHAMAN MLR HEADER ────────────────────── */}
+      <div className="mlr-header">
+        <div className="mlr-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M16 6c0-2.2-1.8-4-4-4H10C7.8 2 6 3.8 6 6c0 2.2 1.8 4 4 4h4c2.2 0 4 1.8 4 4 0 2.2-1.8 4-4 4h-4c-2.2 0-4-1.8-4-4"
+              stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <span className="mlr-title">Shaman MLR X-Ray</span>
+        <span className="mlr-sep"/>
+        <span className="mlr-doc" title={assetId}>{headerDocName}</span>
+        <span className="mlr-doctype">{headerDocType}</span>
+
+        <div style={{flex:1}}/>
+
+        <div style={{display:'flex',alignItems:'center',gap:0,marginRight:6}}>
+          <span className="mlr-avatar"     title="Frances Smith">FS</span>
+          <span className="mlr-avatar alt" title="Maurice van Leeuwen" style={{marginLeft:-6}}>ML</span>
+        </div>
+        <button className="mlr-libbtn" onClick={()=>toast('Library — coming soon','i')}>Library</button>
+      </div>
+
       {/* ── TOOLBAR ──────────────────────────────── */}
       <div className="toolbar">
         <span style={{fontSize:12,fontWeight:500,color:'#111827',whiteSpace:'nowrap'}}>
