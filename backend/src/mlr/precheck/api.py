@@ -300,4 +300,5 @@ def health() -> dict:
         "library_size": library.total_size(),
         "library_bootstrapped": library.total_size() != 3,  # 3 = the hardcoded fallback
         "baseline_size": baseline.total_size(),
+        "baseline_path": str(baseline_bootstrap.curated_path()),
     }

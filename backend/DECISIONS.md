@@ -412,7 +412,67 @@ while leaving text blocks granular. Or add a UI-side toggle:
 "compact" (deduped) vs "granular" (per-block).
 **Status:** `pinned`.
 
-### D29 — UK baseline pattern bank (next slice — not implemented)
+### D32 — Group-level claim approval (deferred)
+
+**Current value:** Layer 1 (`claim_check`) compares one extracted
+module's `synthesized_text` against approved canonicals as a single
+text blob. There is no concept of "group has X parts; flag missing
+parts".
+**Where to wire when needed:** `mlr.precheck.claim_check` →
+new `claim_group_check.py`; the Verdict surfaces missing fragments
+("Approved KISQALI efficacy claim group typically includes a
+comparator fragment — current asset is missing it").
+**User's clarification of the model:**
+- **Module = group.** A module is the claim concept (one efficacy
+  story; one safety story; etc.). Approval should target modules,
+  not individual fragments.
+- **Fragment = a piece linked into the module.** Fragments represent
+  links — "this claim text is linked to this graph"; "this comparator
+  number is linked to this study source". The link itself carries
+  meaning.
+- For approval: we approve a MODULE (the group). When precheck runs on
+  a new asset, it detects: "module X matches the approved KISQALI
+  efficacy module template, but is missing the comparator-graph link".
+**Status:** `deferred` per user; will pick up when the structural
+baseline path is exercised end-to-end.
+
+### D31 — Edit extracted text + superscript (TODO)
+
+**Current value:** the X-Ray drawer's annotation composer pre-fills
+text from the verdict but does NOT support inline editing of the
+extracted text (only bbox coordinates can be edited via the prototype
+layer, not the text content). Superscripts (reference markers like
+`²`, `⁴,⁵`) are extracted as inline characters but not editable.
+**Why it matters:** the MLR reviewer needs to clean up the extracted
+text before approving (typo fixes, normalisation, fixing OCR slips).
+The cleaned text becomes the canonical exemplar in the baseline (D29);
+quality of the baseline depends on this cleanup step.
+**Where to wire:** new edit-mode toggle in the drawer's expanded zone
+view; rich-text or contenteditable for the extracted_content field;
+superscript-aware tokeniser for ref-marker preservation. Backend route
+to persist edits (`POST /api/precheck/{asset_id}/zones/{zone_id}/edit`).
+**Status:** `deferred — TODO`. Not blocking the structural baseline
+demo but will be needed before the curated approval path can be used
+for production-grade pattern matching.
+
+### D30 — Baseline file location is env-var configurable
+
+**Current value:** `mlr.ingest.baseline_bootstrap.curated_path()`
+returns `MLR_BASELINE_PATH` env var if set, else
+`backend/baselines/uk_email_baselines.jsonl`.
+**Why this value:** the MLR Precheck POC and the extractor service
+live in separate repos. Letting the extractor service write to its
+own path (e.g.
+`extractor-service/data/approved/uk_email_baselines.jsonl`) and
+having our backend read via env var avoids both duplication and
+symlinks. `/api/health` reports the resolved path so it's discoverable
+at runtime.
+**How to revise:** swap to a small HTTP endpoint that pulls from the
+extractor service if cross-machine deploys ever matter. For local POC
+the env var is enough.
+**Status:** `pinned`.
+
+### D29 — UK baseline pattern bank (implemented)
 
 **Current value:** structural zones emit `Extracted` (status `clean`,
 severity `info`) without verifying the block's text against an

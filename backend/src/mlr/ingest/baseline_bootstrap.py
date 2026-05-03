@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -156,19 +157,33 @@ def bootstrap_from_dir(extractions_dir: Path, *, window_months: int = 18) -> lis
 # ─── unified entrypoint ───────────────────────────────────────────────
 
 
-_CURATED_PATH = (
+# Default location inside this repo. Override via MLR_BASELINE_PATH so
+# the extractor service can write its approval output to its own path.
+_DEFAULT_CURATED_PATH = (
     Path(__file__).resolve().parents[3]  # backend/
     / "baselines"
     / "uk_email_baselines.jsonl"
 )
 
 
+def curated_path() -> Path:
+    """Resolve the curated baseline file location (env var wins)."""
+    env = os.environ.get("MLR_BASELINE_PATH")
+    if env:
+        return Path(env).expanduser()
+    return _DEFAULT_CURATED_PATH
+
+
 def load_default_baseline(extractions_dir: Path | None = None) -> list[BaselineExemplar]:
     """
-    Curated file wins; fall back to bootstrap from `extractions_dir`
-    (when that directory exists). Returns empty list if neither.
+    Resolution order:
+      1. MLR_BASELINE_PATH env var (or default backend/baselines/…) — if
+         the file exists and is non-empty, it wins.
+      2. Bootstrap from `extractions_dir` — option B fallback per D29
+         (treats every observed text as approved).
+      3. Empty list.
     """
-    curated = load_curated_file(_CURATED_PATH)
+    curated = load_curated_file(curated_path())
     if curated:
         return curated
     if extractions_dir and extractions_dir.is_dir():
