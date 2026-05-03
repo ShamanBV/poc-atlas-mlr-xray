@@ -77,6 +77,8 @@
       zones: (asset.zones || []).map(adaptZone),
       emailBlocks: (asset.email_blocks || []).map(adaptEmailBlock),
       library: asset.library,
+      counts: asset.counts || {references:0, footnotes:0, abbreviations:0, blocks:0, modules:0, visuals:0},
+      profile: asset.profile,
       preview: asset.preview,
       // History strands: backend doesn't ship them yet on the precheck
       // payload (separate endpoint per §3.3). Stub empty so the

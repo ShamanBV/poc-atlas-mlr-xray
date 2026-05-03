@@ -12,7 +12,7 @@
   <!-- Cache-bust the JSX/JS files: Babel-standalone caches by URL regardless
        of HTTP headers. Bump the v= when editing any of the JSX files. -->
   <script>window.__JSX_V__ = '5';</script>
-  <script src="adapter.js?v=6"></script>
+  <script src="adapter.js?v=7"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; overflow: hidden; }
@@ -117,9 +117,9 @@
   }
 </script>
 
-<script type="text/babel" src="XRayData.jsx?v=6"></script>
-<script type="text/babel" src="XRayEmail.jsx?v=6"></script>
-<script type="text/babel" src="XRayDrawer.jsx?v=6"></script>
+<script type="text/babel" src="XRayData.jsx?v=7"></script>
+<script type="text/babel" src="XRayEmail.jsx?v=7"></script>
+<script type="text/babel" src="XRayDrawer.jsx?v=7"></script>
 
 <script type="text/babel" data-presets="env,react">
 const { useState, useEffect, useRef, useCallback } = React;
@@ -334,9 +334,6 @@ const PagedPreview = ({ assetId, asset, emailRef, hoveredZone, selectedZone, onH
           onSelect={onSelect}
         />
       ))}
-      <div style={{ marginTop:10, fontSize:11, color:PALETTE.grey400, textAlign:'center', lineHeight:1.6 }}>
-        Page render at {pages?.dpi || '—'} DPI · click a zone to cross-link with the X-Ray
-      </div>
     </div>
   );
 };

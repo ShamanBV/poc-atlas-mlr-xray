@@ -19,6 +19,7 @@ from typing import Iterable
 
 from .schema import (
     Asset,
+    AssetCounts,
     AssetLibrary,
     AssetPreview,
     AssetProfile,
@@ -142,6 +143,25 @@ def build_asset(
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     library_ts = library_last_ingest_at or now_iso
 
+    # Per-asset counts for the X-Ray asset card.
+    counts = AssetCounts(
+        references=sum(
+            len(r.members) for r in extracted.supportive_resources
+            if r.type == "reference-set"
+        ),
+        footnotes=sum(
+            len(r.members) for r in extracted.supportive_resources
+            if r.type == "footnote-set"
+        ),
+        abbreviations=sum(
+            len(r.members) for r in extracted.supportive_resources
+            if r.type == "abbreviation-set"
+        ),
+        blocks=len(extracted.blocks),
+        modules=len(extracted.modules),
+        visuals=len(extracted.visuals),
+    )
+
     return Asset(
         asset_id=extracted.asset_id,
         meta=extracted.meta,
@@ -164,6 +184,7 @@ def build_asset(
             last_ingest_at=library_ts,
             coverage_warning=coverage_warning,
         ),
+        counts=counts,
         preview=AssetPreview(
             pdf_url=pdf_url,
             html_url=None,

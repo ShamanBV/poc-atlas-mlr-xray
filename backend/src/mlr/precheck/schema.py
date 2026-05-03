@@ -136,6 +136,16 @@ class AssetLibrary(BaseModel):
     coverage_warning: Optional[str] = None
 
 
+class AssetCounts(BaseModel):
+    """Per-asset counts surfaced in the X-Ray asset card."""
+    references: int = Field(default=0, ge=0)
+    footnotes: int = Field(default=0, ge=0)
+    abbreviations: int = Field(default=0, ge=0)
+    blocks: int = Field(default=0, ge=0)
+    modules: int = Field(default=0, ge=0)
+    visuals: int = Field(default=0, ge=0)
+
+
 class AssetPreview(BaseModel):
     pdf_url: Optional[str] = None
     html_url: Optional[str] = None
@@ -160,6 +170,7 @@ class Asset(BaseModel):
     zones: list[Zone]
     email_blocks: list[EmailBlock]
     library: AssetLibrary
+    counts: AssetCounts = Field(default_factory=AssetCounts)
     preview: AssetPreview
 
     generated_at: str  # ISO timestamp

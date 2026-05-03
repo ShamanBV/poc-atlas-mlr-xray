@@ -2,6 +2,74 @@
 
 const { useState, useEffect, useRef, useCallback } = React;
 
+// ─── ASSET META CARD ─────────────────────────────────────────────────────────
+// Collapsible card showing brand/market/lang/refs/footnotes/doc-type/approval.
+// Driven by asset.meta + asset.counts + asset.profile from the live backend.
+const AssetMetaCard = ({ asset }) => {
+  const [open, setOpen] = useState(true);
+  const m = asset.meta || {};
+  const c = asset.counts || {};
+  const profile = asset.profile?.id;
+  const subtitle = m.brand
+    ? `${m.brand}${m.market ? ' · ' + m.market : ''}`
+    : asset.identity || '—';
+
+  const fields = [
+    { k: 'BRAND',      v: m.brand    || '—' },
+    { k: 'MARKET',     v: m.market   || '—' },
+    { k: 'LANG',       v: m.language || '—' },
+    { k: 'REFERENCES', v: String(c.references ?? 0) },
+    { k: 'FOOTNOTES',  v: String(c.footnotes  ?? 0) },
+    { k: 'DOC TYPE',   v: m.doc_type ? m.doc_type.charAt(0).toUpperCase() + m.doc_type.slice(1) : '—' },
+  ];
+  const fullWidth = [];
+  if (profile)  fullWidth.push({ k: 'PROFILE',  v: profile });
+  if (m.code)   fullWidth.push({ k: 'APPROVAL', v: m.code });
+  if (m.prepared) fullWidth.push({ k: 'PREPARED', v: m.prepared + (m.age != null ? ` · ${m.age}` : '') });
+
+  return (
+    <div style={{ margin:'10px 12px 6px', border:`1.5px solid ${C.grey50}`,
+      borderRadius:8, background:C.white, overflow:'hidden', flexShrink:0 }}>
+      <div onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex', alignItems:'center', gap:7, padding:'7px 11px',
+        background:C.grey25, borderBottom: open ? `1px solid ${C.grey50}` : 'none',
+        cursor:'pointer', userSelect:'none',
+      }}>
+        <span style={{ fontSize:10, color:C.grey400,
+          display:'inline-block', transition:'transform .15s',
+          transform: open ? 'rotate(90deg)' : 'none' }}>▶</span>
+        <span style={{ fontSize:9, fontWeight:700, color:C.grey700,
+          textTransform:'uppercase', letterSpacing:.6 }}>Asset</span>
+        <span style={{ fontSize:11, color:C.grey500, marginLeft:2 }}>{subtitle}</span>
+      </div>
+      {open && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', background:C.white }}>
+          {fields.map(({k,v}, i) => (
+            <div key={k} style={{
+              padding:'7px 11px', borderTop:`1px solid ${C.grey50}`,
+              borderRight: i % 2 === 0 ? `1px solid ${C.grey50}` : 'none',
+            }}>
+              <div style={{ fontSize:9, fontWeight:700, color:C.grey400,
+                textTransform:'uppercase', letterSpacing:.6, marginBottom:2 }}>{k}</div>
+              <div style={{ fontSize:13, fontWeight:500, color:C.grey900 }}>{v}</div>
+            </div>
+          ))}
+          {fullWidth.map(({k,v}) => (
+            <div key={k} style={{
+              gridColumn:'1 / -1', padding:'7px 11px',
+              borderTop:`1px solid ${C.grey50}`,
+            }}>
+              <div style={{ fontSize:9, fontWeight:700, color:C.grey400,
+                textTransform:'uppercase', letterSpacing:.6, marginBottom:2 }}>{k}</div>
+              <div style={{ fontSize:13, fontWeight:500, color:C.grey900 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── LANE PILL ────────────────────────────────────────────────────────────────
 const LanePill = ({ lane }) => {
   const t = laneToken(lane);
@@ -464,10 +532,7 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
                 fontVariantNumeric:'tabular-nums',lineHeight:1 }}>{asset.scores.overall}</span>
               <span style={{ fontSize:12,color:C.grey300,paddingBottom:2 }}>/100</span>
             </div>
-            <div className="mono" style={{ fontSize:9,color:C.grey300,marginTop:6,
-              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:280 }}>
-              {asset.identity}
-            </div>
+            {/* Identity row removed — moved to the AssetMetaCard below the tabs. */}
           </div>
           <div style={{ display:'flex',gap:6,alignItems:'center',flexShrink:0 }}>
             <button onClick={()=>setShowHistory(h=>!h)} title="Version history"
@@ -492,7 +557,8 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
 
       {/* X-ray spine */}
       <div style={{ flex:1,overflowY:'auto',background:C.grey25 }}>
-        <div style={{ background:C.white,borderBottom:`1px solid ${C.grey50}` }}>
+        <AssetMetaCard asset={asset}/>
+        <div style={{ background:C.white,borderBottom:`1px solid ${C.grey50}`,borderTop:`1px solid ${C.grey50}` }}>
           {filteredZones.length === 0 ? (
             <div style={{ padding:'20px 14px',fontSize:12,color:C.grey400,textAlign:'center' }}>
               No zones assigned to this function for this asset.
