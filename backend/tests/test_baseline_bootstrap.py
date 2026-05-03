@@ -10,6 +10,7 @@ from mlr.ingest.baseline_bootstrap import (
     exemplar_to_dict,
     load_curated_file,
     load_default_baseline,
+    merge_exemplars,
     write_jsonl,
 )
 from mlr.precheck.baseline import BaselineExemplar
@@ -183,8 +184,43 @@ def test_visual_round_trip(tmp_path: Path):
     assert by_role["VISUAL_LOGO"].image_url is None  # missing field round-trips as None
 
 
+def test_merge_exemplars_dedupes_by_pattern_id():
+    """Same pattern_id → n incremented, max(coverage), latest first_seen."""
+    a = BaselineExemplar(
+        role="PROMOTIONAL_NOTICE", text="Notice text",
+        n=2, coverage=0.4, first_seen="2024-01",
+        source_id="x", pattern_id="p1",
+    )
+    b = BaselineExemplar(
+        role="PROMOTIONAL_NOTICE", text="Notice text",  # same role+text
+        n=3, coverage=0.7, first_seen="2026-05",
+        source_id="y", pattern_id="p1",  # same pattern_id → merge
+    )
+    c = BaselineExemplar(
+        role="APPROVAL_INFO", text="FA-123",
+        n=1, coverage=0.1, first_seen="2026-05",
+        source_id="z", pattern_id="p2",
+    )
+    merged = merge_exemplars([a], [b, c])
+    by_pid = {ex.pattern_id: ex for ex in merged}
+    assert len(merged) == 2
+    assert by_pid["p1"].n == 5  # 2 + 3
+    assert by_pid["p1"].coverage == 0.7
+    assert by_pid["p1"].first_seen == "2026-05"
+    assert by_pid["p2"].n == 1
+
+
+def test_merge_with_empty_existing_returns_incoming():
+    a = BaselineExemplar(role="X", text="t", pattern_id="p1")
+    assert merge_exemplars([], [a]) == [a]
+
+
 def test_bootstrap_harvests_visuals_from_extraction(tmp_path: Path):
-    """bootstrap_from_dir picks up `visuals[]` alongside `blocks[]`."""
+    """
+    bootstrap_from_dir picks up `visuals[]` alongside `blocks[]`. Visuals
+    use the spec taxonomy roles per CLASSIFICATION_TO_MLR_MAP.md §5:
+    BRAND_VISUAL / MEDICAL_VISUAL / DATA_VISUAL / TABLE.
+    """
     src_dir = tmp_path / "src"
     src_dir.mkdir()
     (src_dir / "fake.extraction.json").write_text(
@@ -196,20 +232,36 @@ def test_bootstrap_harvests_visuals_from_extraction(tmp_path: Path):
         ' "link":{"uri":"https://x.example/banner.png","visible_text":"HCP only"}},'
         '{"id":"v2","type":"figure","kind":"logo","bbox":[10,10,100,50],"page":0,'
         ' "description":"Brand logo CARDIOMAX",'
+        ' "link":{"uri":"","visible_text":""}},'
+        '{"id":"v3","type":"figure","kind":"chart","bbox":[10,10,400,300],"page":0,'
+        ' "description":"Bar chart showing 25.2% reduction at 5 years",'
+        ' "link":{"uri":"","visible_text":""}},'
+        '{"id":"v4","type":"figure","kind":"icon","bbox":[10,10,30,30],"page":0,'
+        ' "description":"Pill icon",'
         ' "link":{"uri":"","visible_text":""}}'
         ']}'
     )
     result = bootstrap_from_dir(src_dir)
-    by_role = {ex.role: ex for ex in result}
-    # text row
+    by_role: dict[str, list[BaselineExemplar]] = {}
+    for ex in result:
+        by_role.setdefault(ex.role, []).append(ex)
+
+    # Text row keeps its role unchanged.
     assert "PROMOTIONAL_NOTICE" in by_role
-    assert by_role["PROMOTIONAL_NOTICE"].kind == "text"
-    # visual rows — role prefixed with VISUAL_
-    assert "VISUAL_BANNER" in by_role
-    assert by_role["VISUAL_BANNER"].kind == "visual"
-    assert by_role["VISUAL_BANNER"].image_url == "https://x.example/banner.png"
-    assert by_role["VISUAL_BANNER"].ocr_text == "HCP only"
-    assert "VISUAL_LOGO" in by_role
+    assert by_role["PROMOTIONAL_NOTICE"][0].kind == "text"
+
+    # banner + logo → BRAND_VISUAL; chart → DATA_VISUAL; icon → MEDICAL_VISUAL.
+    assert "BRAND_VISUAL" in by_role
+    assert "DATA_VISUAL" in by_role
+    assert "MEDICAL_VISUAL" in by_role
+    bv_kinds = {ex.visual_kind for ex in by_role["BRAND_VISUAL"]}
+    assert bv_kinds == {"banner", "logo"}
+    # classification field mirrors role for visuals
+    assert all(ex.classification == ex.role for ex in by_role["BRAND_VISUAL"])
+    # banner exemplar still preserves image_url + ocr_text
+    banner = next(ex for ex in by_role["BRAND_VISUAL"] if ex.visual_kind == "banner")
+    assert banner.image_url == "https://x.example/banner.png"
+    assert banner.ocr_text == "HCP only"
 
 
 def test_load_default_falls_back_to_bootstrap(monkeypatch, tmp_path: Path):

@@ -130,6 +130,45 @@ def _harvest_block_texts(extractions_dir: Path) -> Iterable[tuple[str, str, str]
             yield role, text, asset_id
 
 
+# Map extractor's visual.kind → semantic role from
+# CLASSIFICATION_TO_MLR_MAP.md §5.
+# - BRAND_VISUAL:  logo / hero / banner / packshot
+# - MEDICAL_VISUAL: person_photo / illustration / icon / play_video_banner
+# - DATA_VISUAL:   chart / infographic / diagram / dosing_related / key_number
+# - TABLE:         table
+# Unknown / unclassified visuals default to BRAND_VISUAL (neutral; the
+# MLR cascade rule for that classification is the gentlest).
+_VISUAL_KIND_TO_CLASSIFICATION: dict[str, str] = {
+    # BRAND_VISUAL
+    "banner":            "BRAND_VISUAL",
+    "logo":              "BRAND_VISUAL",
+    "hero":              "BRAND_VISUAL",
+    "packshot":          "BRAND_VISUAL",
+    # MEDICAL_VISUAL
+    "photo":             "MEDICAL_VISUAL",
+    "patient":           "MEDICAL_VISUAL",
+    "person_photo":      "MEDICAL_VISUAL",
+    "icon":              "MEDICAL_VISUAL",
+    "illustration":      "MEDICAL_VISUAL",
+    "play_video_banner": "MEDICAL_VISUAL",
+    # DATA_VISUAL
+    "chart":             "DATA_VISUAL",
+    "infographic":       "DATA_VISUAL",
+    "diagram":           "DATA_VISUAL",
+    "dosing_related":    "DATA_VISUAL",
+    "key_number":        "DATA_VISUAL",
+    # TABLE
+    "table":             "TABLE",
+}
+
+
+def _classification_for_kind(kind: str | None) -> str:
+    """Returns one of BRAND_VISUAL / MEDICAL_VISUAL / DATA_VISUAL / TABLE."""
+    if not kind:
+        return "BRAND_VISUAL"
+    return _VISUAL_KIND_TO_CLASSIFICATION.get(kind.lower(), "BRAND_VISUAL")
+
+
 def _harvest_visuals(extractions_dir: Path):
     """
     Yield raw visual dicts + source asset_id for each visual that has
@@ -200,8 +239,12 @@ def bootstrap_from_dir(extractions_dir: Path, *, window_months: int = 18) -> lis
     v_seen_asset_ids: dict[str, set[str]] = defaultdict(set)
 
     for v, asset_id, description, visible_text, uri in _harvest_visuals(extractions_dir):
-        v_kind = (v.get("kind") or "unknown").lower()
-        role = f"VISUAL_{v_kind.upper()}"
+        v_kind = v.get("kind")
+        # Role + classification follow the spec taxonomy
+        # (CLASSIFICATION_TO_MLR_MAP.md §5): BRAND_VISUAL /
+        # MEDICAL_VISUAL / DATA_VISUAL / TABLE. Mirrors the field names
+        # the extractor service writes in its approval flow.
+        role = _classification_for_kind(v_kind)
         # Use description as the dedupe key when present; fall back to
         # OCR text or URI to keep distinct visuals separate.
         dedupe_text = description or visible_text or uri or "(unknown)"
@@ -237,7 +280,9 @@ def bootstrap_from_dir(extractions_dir: Path, *, window_months: int = 18) -> lis
             visual_kind=v.get("kind"),
             image_url=meta["uri"] or None,
             ocr_text=meta["ocr"] or None,
-            classification=None,  # placeholder — wire when classifier ships
+            # `classification` mirrors `role` for visuals — same value;
+            # extractor service writes both for symmetry.
+            classification=role,
             page=page,
             bbox=bbox,
         ))
@@ -299,6 +344,51 @@ def exemplar_to_dict(ex: BaselineExemplar) -> dict:
             "bbox":           list(ex.bbox) if ex.bbox else None,
         })
     return out
+
+
+def merge_exemplars(
+    existing: list[BaselineExemplar],
+    incoming: list[BaselineExemplar],
+) -> list[BaselineExemplar]:
+    """
+    Merge two exemplar lists. Dedupe by `pattern_id` (which is a stable
+    hash of role + text). On collision the existing row's count is
+    incremented by the incoming `n`; coverage is recomputed via a
+    simple max() since we don't track per-asset denominators across
+    runs. Caller can re-bootstrap from full source if exact coverage
+    matters.
+
+    Rows with no `pattern_id` (legacy) are appended as-is.
+    """
+    by_pid: dict[str, BaselineExemplar] = {}
+    order: list[str] = []
+    for ex in existing + incoming:
+        pid = ex.pattern_id
+        if not pid:
+            order.append(_anonymous_token())  # synthesise a unique key for ordering
+            by_pid[order[-1]] = ex
+            continue
+        if pid in by_pid:
+            prior = by_pid[pid]
+            by_pid[pid] = BaselineExemplar(
+                **{**prior.__dict__,
+                   "n": prior.n + ex.n,
+                   "coverage": max(prior.coverage, ex.coverage),
+                   # latest first_seen wins so freshness isn't masked
+                   "first_seen": max(prior.first_seen, ex.first_seen) if prior.first_seen and ex.first_seen else (prior.first_seen or ex.first_seen),
+                   }
+            )
+        else:
+            by_pid[pid] = ex
+            order.append(pid)
+    return [by_pid[k] for k in order]
+
+
+_anon_seq = 0
+def _anonymous_token() -> str:
+    global _anon_seq
+    _anon_seq += 1
+    return f"__anon_{_anon_seq}"
 
 
 def write_jsonl(path: Path, exemplars: list[BaselineExemplar]) -> int:

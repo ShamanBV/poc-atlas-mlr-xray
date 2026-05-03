@@ -34,6 +34,8 @@ from pathlib import Path
 from mlr.ingest.baseline_bootstrap import (
     bootstrap_from_dir,
     curated_path,
+    load_curated_file,
+    merge_exemplars,
     write_jsonl,
 )
 
@@ -56,6 +58,11 @@ def main(argv: list[str] | None = None) -> int:
              "backend/baselines/uk_email_baselines.jsonl).",
     )
     p.add_argument("--dry-run", action="store_true", help="Print summary, don't write.")
+    p.add_argument(
+        "--merge", action="store_true",
+        help="Merge into the existing --out file instead of overwriting. "
+             "Dedupes by pattern_id; collisions increment n + take max(coverage).",
+    )
     args = p.parse_args(argv)
 
     src: Path = args.source
@@ -65,12 +72,26 @@ def main(argv: list[str] | None = None) -> int:
 
     out = args.out or curated_path()
 
-    exemplars = bootstrap_from_dir(src)
-    by_role = Counter(ex.role for ex in exemplars)
+    incoming = bootstrap_from_dir(src)
 
     print(f"Source:       {src}")
     print(f"Target file:  {out}")
-    print(f"Total:        {len(exemplars)} exemplars")
+    print(f"Mode:         {'merge into existing' if args.merge else 'overwrite'}")
+
+    if args.merge and out.is_file():
+        existing = load_curated_file(out)
+        final = merge_exemplars(existing, incoming)
+        new_count = len(final) - len(existing)
+        print(f"Existing:     {len(existing)} exemplars in target")
+        print(f"Incoming:     {len(incoming)} from source")
+        print(f"After merge:  {len(final)} ({new_count} added, {len(incoming) - new_count} merged into existing patterns)")
+    else:
+        if args.merge:
+            print(f"  (target file doesn't exist yet — first write)")
+        final = incoming
+        print(f"Total:        {len(final)} exemplars")
+
+    by_role = Counter(ex.role for ex in final)
     print("Per role:")
     for role, n in sorted(by_role.items(), key=lambda kv: (-kv[1], kv[0])):
         print(f"  {role:<28} {n}")
@@ -79,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[dry-run] not writing.")
         return 0
 
-    n_written = write_jsonl(out, exemplars)
+    n_written = write_jsonl(out, final)
     print(f"\nWrote {n_written} exemplars → {out}")
     return 0
 
