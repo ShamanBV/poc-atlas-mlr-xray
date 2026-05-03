@@ -378,7 +378,8 @@ const ZoneRow = ({ zone, isHovered, isSelected, onHover, isOpen, onToggle, zoneA
   );
 
   return (
-    <div style={{ borderBottom:`1px solid ${C.grey50}` }}
+    <div data-zone-row-id={zone.id}
+      style={{ borderBottom:`1px solid ${C.grey50}` }}
       onMouseEnter={()=>onHover(zone.id)} onMouseLeave={()=>onHover(null)}>
 
       {/* Zone row header */}
@@ -530,20 +531,24 @@ const TabBar = ({ active, onSelect, asset }) => {
       {tabs.map(tab=>{
         const isActive = active===tab.id;
         const laneCol  = tab.lane ? laneToken(tab.lane) : null;
+        // Active tab: solid primary.600 fill (#00A66F), white text + dot.
+        // Inactive: transparent fill, grey text, lane-colour dot.
         return (
           <div key={tab.id} onClick={()=>onSelect(tab.id)} style={{
-            display:'flex',alignItems:'center',gap:4,
+            display:'flex',alignItems:'center',gap:5,
             padding:'6px 12px',borderRadius:6,cursor:'pointer',userSelect:'none',
-            background:isActive?C.white:'transparent',
-            boxShadow:isActive?'0 1px 3px rgba(0,0,0,0.1)':'none',
+            background:isActive?'#00A66F':'transparent',
+            boxShadow:isActive?'0 1px 3px rgba(0,0,0,0.10)':'none',
             transition:'all 0.12s',
           }}>
             {laneCol && <span style={{ width:7,height:7,borderRadius:'50%',
-              background:laneCol.text,flexShrink:0,opacity:isActive?1:0.5 }}/>}
+              background: isActive ? '#fff' : laneCol.text,
+              flexShrink:0, opacity: isActive ? 1 : 0.7 }}/>}
             <span style={{ fontSize:13,fontWeight:isActive?600:400,
-              color:isActive?(laneCol?laneCol.text:C.grey900):C.grey500,
+              color: isActive ? '#fff' : C.grey500,
               whiteSpace:'nowrap' }}>{tab.label}</span>
-            <span style={{ fontSize:11,color:isActive?(laneCol?laneCol.text:C.grey500):C.grey400,
+            <span style={{ fontSize:11,
+              color: isActive ? 'rgba(255,255,255,0.85)' : C.grey400,
               fontVariantNumeric:'tabular-nums' }}>{countForTab(tab.id)}</span>
           </div>
         );
@@ -665,6 +670,32 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
     }
   }, [activeTab, asset.identity]);
 
+  // External selection (e.g. user clicked a rectangle on the PDF preview)
+  // → switch to a tab that contains the zone, expand it, scroll into view.
+  const drawerScrollRef = useRef(null);
+  useEffect(() => {
+    if (!selectedZone) return;
+    const zone = asset.zones.find(z => z.id === selectedZone);
+    if (!zone) return;
+    // If the active tab filters out this zone, jump to "all" so it's visible.
+    if (activeTab !== 'all' && !zone.lanes.includes(activeTab)) {
+      setActiveTab('all');
+    }
+    setOpenZone(selectedZone);
+    // Scroll the row into view inside the drawer's scroll container.
+    requestAnimationFrame(() => {
+      const container = drawerScrollRef.current;
+      if (!container) return;
+      const row = container.querySelector(`[data-zone-row-id="${CSS.escape(selectedZone)}"]`);
+      if (row) {
+        const rowRect = row.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const offset = rowRect.top - containerRect.top - 80;
+        container.scrollBy({ top: offset, behavior: 'smooth' });
+      }
+    });
+  }, [selectedZone, asset.identity]);
+
   const scrollEmailTo = useCallback(zoneId => {
     if (!emailRef.current) return;
     const el = emailRef.current.querySelector(`[data-zone-id="${zoneId}"]`);
@@ -734,7 +765,7 @@ const Drawer = ({ asset, role, onClose, hoveredZone, selectedZone, onZoneHover, 
       <CheckSummary zones={asset.zones} activeTab={activeTab} asset={asset} zoneActions={zoneActions}/>
 
       {/* X-ray spine */}
-      <div style={{ flex:1,overflowY:'auto',background:C.grey25 }}>
+      <div ref={drawerScrollRef} style={{ flex:1,overflowY:'auto',background:C.grey25 }}>
         <AssetMetaCard asset={asset}/>
         <VisualLibraryCard/>
         <div style={{ background:C.white,borderBottom:`1px solid ${C.grey50}`,borderTop:`1px solid ${C.grey50}` }}>
