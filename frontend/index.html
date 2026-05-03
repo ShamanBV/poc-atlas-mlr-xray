@@ -1524,15 +1524,11 @@ function App(){
         </div>
       </div>
 
-      {/* ── BOTTOM BAR ───────────────────────────── */}
-      <div className="btmbar">
-        <span style={{fontSize:10,fontWeight:600,color:'#d1d5db',letterSpacing:.6,textTransform:'uppercase',marginRight:4}}>Use structured output →</span>
-        {[{l:'Compile',c:P600,d:'Build a claims library'},{l:'Repurpose',c:P800,d:'Generate content variants'},{l:'Compare',c:G800,d:'Diff against another document'}].map(({l,c,d})=>(
-          <Tip key={l} text={d} wide><button className="ds-btn" onClick={()=>toast(`${l}: coming soon`,'i')} style={{color:c,borderColor:`${c}44`,background:`${c}08`}}>{l}</button></Tip>
-        ))}
-        <div style={{flex:1}}/>
-        <span style={{fontSize:10,color:'#d1d5db'}}>{totalCount} structures · {claims.length} claims · {other.filter(a=>a.type==='REGULATORY'||a.type==='LEGAL').length} reg</span>
-      </div>
+      {/* ── BOTTOM BAR removed per design direction ────────────────────
+         Was: "Use structured output →" with Compile / Repurpose / Compare
+         stub buttons + a counts summary. The buttons were toast-only
+         placeholders (downstream workflow entry points, not in scope
+         for the precheck POC). Removed to reduce visual noise.        */}
 
       <AddModal open={addModal} onOk={({type,text})=>{
         const id='a'+Date.now();
