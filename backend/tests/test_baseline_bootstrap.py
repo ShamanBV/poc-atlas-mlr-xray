@@ -18,7 +18,8 @@ from mlr.precheck.baseline import BaselineExemplar
 # ─── exemplar_to_dict (the on-disk schema is the contract) ───────────
 
 
-def test_exemplar_to_dict_keys_are_stable():
+def test_exemplar_to_dict_text_row_keys_are_stable():
+    """Text-row JSON: 9 keys (kind discriminator + the 8 text fields)."""
     ex = BaselineExemplar(
         role="PROMOTIONAL_NOTICE",
         text="This is a promotional email from Novartis intended for GB HCPs.",
@@ -31,11 +32,37 @@ def test_exemplar_to_dict_keys_are_stable():
     )
     d = exemplar_to_dict(ex)
     assert sorted(d.keys()) == sorted([
-        "role", "text", "n", "coverage", "window_months",
+        "kind", "role", "text", "n", "coverage", "window_months",
         "first_seen", "source_id", "pattern_id",
     ])
-    # `coverage` rounds to 4 decimals on disk
+    assert d["kind"] == "text"
     assert d["coverage"] == 0.8333
+
+
+def test_exemplar_to_dict_visual_row_includes_visual_fields():
+    """Visual rows carry the extra block of fields."""
+    ex = BaselineExemplar(
+        role="VISUAL_BANNER",
+        text="A disclaimer banner stating that this is promotional.",
+        n=2,
+        coverage=0.4,
+        first_seen="2024-09",
+        source_id="asset_xxx",
+        pattern_id="uk_email_visual_banner_xxxx",
+        kind="visual",
+        visual_kind="banner",
+        image_url="https://example.com/banner.png",
+        ocr_text="Promotional material",
+        classification=None,
+        page=1,
+        bbox=[0.0, 0.0, 600.0, 60.0],
+    )
+    d = exemplar_to_dict(ex)
+    for key in ("visual_kind", "image_url", "ocr_text", "classification", "page", "bbox"):
+        assert key in d
+    assert d["kind"] == "visual"
+    assert d["visual_kind"] == "banner"
+    assert d["bbox"] == [0.0, 0.0, 600.0, 60.0]
 
 
 # ─── round-trip ──────────────────────────────────────────────────────
@@ -124,6 +151,65 @@ def test_load_default_prefers_curated_over_bootstrap(monkeypatch, tmp_path: Path
     result = load_default_baseline(empty_dir)
     assert len(result) == 1
     assert result[0].text == "from curated"
+
+
+def test_visual_round_trip(tmp_path: Path):
+    """Write + read back a visual exemplar; visual fields preserved."""
+    src = [
+        BaselineExemplar(
+            role="VISUAL_BANNER", text="Promotional banner",
+            n=3, coverage=0.6, source_id="a1", pattern_id="vb1",
+            kind="visual", visual_kind="banner",
+            image_url="https://example.com/b.png", ocr_text="HCP only",
+            classification=None, page=1, bbox=[0.0, 0.0, 600.0, 60.0],
+        ),
+        BaselineExemplar(
+            role="VISUAL_LOGO", text="Brand logo",
+            n=1, coverage=0.04, source_id="a2", pattern_id="vl1",
+            kind="visual", visual_kind="logo", page=1,
+            bbox=[10.0, 10.0, 100.0, 50.0],
+        ),
+    ]
+    f = tmp_path / "with_visuals.jsonl"
+    write_jsonl(f, src)
+
+    loaded = load_curated_file(f)
+    by_role = {ex.role: ex for ex in loaded}
+    assert by_role["VISUAL_BANNER"].kind == "visual"
+    assert by_role["VISUAL_BANNER"].visual_kind == "banner"
+    assert by_role["VISUAL_BANNER"].image_url == "https://example.com/b.png"
+    assert by_role["VISUAL_BANNER"].ocr_text == "HCP only"
+    assert by_role["VISUAL_BANNER"].bbox == [0.0, 0.0, 600.0, 60.0]
+    assert by_role["VISUAL_LOGO"].image_url is None  # missing field round-trips as None
+
+
+def test_bootstrap_harvests_visuals_from_extraction(tmp_path: Path):
+    """bootstrap_from_dir picks up `visuals[]` alongside `blocks[]`."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "fake.extraction.json").write_text(
+        '{"asset":{"id":"a1"},'
+        '"blocks":[{"role":"PROMOTIONAL_NOTICE","text":"This is a promotional email from Novartis intended for GB HCPs."}],'
+        '"visuals":['
+        '{"id":"v1","type":"figure","kind":"banner","bbox":[0,0,600,60],"page":0,'
+        ' "description":"A disclaimer banner stating this is promotional.",'
+        ' "link":{"uri":"https://x.example/banner.png","visible_text":"HCP only"}},'
+        '{"id":"v2","type":"figure","kind":"logo","bbox":[10,10,100,50],"page":0,'
+        ' "description":"Brand logo CARDIOMAX",'
+        ' "link":{"uri":"","visible_text":""}}'
+        ']}'
+    )
+    result = bootstrap_from_dir(src_dir)
+    by_role = {ex.role: ex for ex in result}
+    # text row
+    assert "PROMOTIONAL_NOTICE" in by_role
+    assert by_role["PROMOTIONAL_NOTICE"].kind == "text"
+    # visual rows — role prefixed with VISUAL_
+    assert "VISUAL_BANNER" in by_role
+    assert by_role["VISUAL_BANNER"].kind == "visual"
+    assert by_role["VISUAL_BANNER"].image_url == "https://x.example/banner.png"
+    assert by_role["VISUAL_BANNER"].ocr_text == "HCP only"
+    assert "VISUAL_LOGO" in by_role
 
 
 def test_load_default_falls_back_to_bootstrap(monkeypatch, tmp_path: Path):

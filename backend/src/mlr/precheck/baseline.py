@@ -33,16 +33,39 @@ from .similarity import Embedder, combined_similarity, default_embedder
 
 @dataclass(frozen=True)
 class BaselineExemplar:
-    """One approved/observed instance of text for a given structural role."""
+    """
+    One approved/observed exemplar for the baseline corpus.
 
-    role: str          # PROMOTIONAL_NOTICE / AUDIENCE_RESTRICTION / …
-    text: str          # the exemplar text
+    Two flavours, distinguished by `kind`:
+
+    - `kind="text"` — a structural text block (PROMOTIONAL_NOTICE,
+      PRESCRIBING_INFORMATION, …). `text` is the body content.
+    - `kind="visual"` — an extracted figure/image. `text` holds the
+      visual's `description` (AI-described or human-curated). The
+      visual-specific fields (visual_kind / image_url / ocr_text /
+      classification) carry the rest. MLR X-Ray's match() currently
+      only consumes `kind="text"` rows; visual rows are persisted for
+      downstream "repurpose" use (compose new content from approved
+      assets) per user direction.
+    """
+
+    role: str          # PROMOTIONAL_NOTICE / AUDIENCE_RESTRICTION / VISUAL_BANNER / …
+    text: str          # primary text (or visual description)
     n: int = 1         # times this exact text was observed
-    coverage: float = 0.0   # fraction of approved assets this appears in
+    coverage: float = 0.0
     window_months: int = 18
     first_seen: str = "2024-01"
-    source_id: str = ""     # provenance — asset_id of an approving asset
-    pattern_id: str = ""    # stable id, derived from role + hash(text)
+    source_id: str = ""
+    pattern_id: str = ""
+
+    # ── type discriminator + visual-specific fields ───────────────
+    kind: str = "text"                          # "text" | "visual"
+    visual_kind: str | None = None              # banner / logo / photo / icon / chart / …
+    image_url: str | None = None                # if the visual is a hyperlink
+    ocr_text: str | None = None                 # link.visible_text from extractor
+    classification: str | None = None           # AI classification (future)
+    page: int | None = None
+    bbox: list[float] | None = None             # [x0, y0, x1, y1]
 
 
 # ─── runtime state ───────────────────────────────────────────────────

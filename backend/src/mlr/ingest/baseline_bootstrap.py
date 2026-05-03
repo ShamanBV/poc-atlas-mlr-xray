@@ -83,6 +83,11 @@ def load_curated_file(path: Path) -> list[BaselineExemplar]:
         text = d.get("text")
         if not role or not isinstance(text, str) or not text.strip():
             continue
+        bbox = d.get("bbox")
+        if bbox is not None and isinstance(bbox, list) and len(bbox) >= 4:
+            bbox = [float(x) for x in bbox[:4]]
+        else:
+            bbox = None
         out.append(BaselineExemplar(
             role=role,
             text=text,
@@ -92,6 +97,14 @@ def load_curated_file(path: Path) -> list[BaselineExemplar]:
             first_seen=d.get("first_seen", "2024-01"),
             source_id=d.get("source_id", ""),
             pattern_id=d.get("pattern_id") or _stable_pattern_id(role, text),
+            # Visual fields are optional; default to text-row defaults.
+            kind=d.get("kind", "text"),
+            visual_kind=d.get("visual_kind"),
+            image_url=d.get("image_url"),
+            ocr_text=d.get("ocr_text"),
+            classification=d.get("classification"),
+            page=d.get("page"),
+            bbox=bbox,
         ))
     return out
 
@@ -117,14 +130,40 @@ def _harvest_block_texts(extractions_dir: Path) -> Iterable[tuple[str, str, str]
             yield role, text, asset_id
 
 
+def _harvest_visuals(extractions_dir: Path):
+    """
+    Yield raw visual dicts + source asset_id for each visual that has
+    enough data to be useful (description OR ocr text OR a link uri).
+    """
+    for path in sorted(extractions_dir.glob("*.extraction.json")):
+        try:
+            raw = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        asset_id = (raw.get("asset") or {}).get("id") or path.stem
+        for v in raw.get("visuals", []):
+            description = (v.get("description") or "").strip()
+            link = v.get("link") or {}
+            visible_text = (link.get("visible_text") or "").strip() if isinstance(link, dict) else ""
+            uri = (link.get("uri") or "").strip() if isinstance(link, dict) else ""
+            # Skip empty visuals — no description, no OCR, no link → nothing to bank.
+            if not description and not visible_text and not uri:
+                continue
+            yield v, asset_id, description, visible_text, uri
+
+
 def bootstrap_from_dir(extractions_dir: Path, *, window_months: int = 18) -> list[BaselineExemplar]:
     """
     Build a baseline from existing extractor outputs in `extractions_dir`.
 
-    Per-role dedup by exact text. Coverage approximated as
+    Returns text exemplars (one per (role, exact_text) tuple) AND
+    visual exemplars (one per (visual_kind, description) tuple).
+
+    Per-row dedup by exact text. Coverage approximated as
     `min(1.0, n / total_assets_seen_for_role)`. Source_id captures one
     contributing asset for traceability.
     """
+    # ── text rows ─────────────────────────────────────────────────
     counts: dict[tuple[str, str], int] = defaultdict(int)
     sample_source: dict[tuple[str, str], str] = {}
     role_totals: dict[str, int] = defaultdict(int)
@@ -149,7 +188,60 @@ def bootstrap_from_dir(extractions_dir: Path, *, window_months: int = 18) -> lis
             first_seen="2024-01",
             source_id=sample_source.get((role, text), ""),
             pattern_id=_stable_pattern_id(role, text),
+            kind="text",
         ))
+
+    # ── visual rows ───────────────────────────────────────────────
+    # Dedupe by (visual_kind, description) — same picture used in
+    # multiple places usually has the same AI description.
+    v_counts: dict[tuple[str, str], int] = defaultdict(int)
+    v_sample: dict[tuple[str, str], dict] = {}
+    v_role_totals: dict[str, int] = defaultdict(int)
+    v_seen_asset_ids: dict[str, set[str]] = defaultdict(set)
+
+    for v, asset_id, description, visible_text, uri in _harvest_visuals(extractions_dir):
+        v_kind = (v.get("kind") or "unknown").lower()
+        role = f"VISUAL_{v_kind.upper()}"
+        # Use description as the dedupe key when present; fall back to
+        # OCR text or URI to keep distinct visuals separate.
+        dedupe_text = description or visible_text or uri or "(unknown)"
+        key = (role, dedupe_text)
+        v_counts[key] += 1
+        if key not in v_sample:
+            v_sample[key] = {
+                "v": v, "asset_id": asset_id, "description": description,
+                "ocr": visible_text, "uri": uri,
+            }
+        if asset_id not in v_seen_asset_ids[role]:
+            v_seen_asset_ids[role].add(asset_id)
+            v_role_totals[role] += 1
+
+    for (role, dedupe_text), n in v_counts.items():
+        meta = v_sample[(role, dedupe_text)]
+        v = meta["v"]
+        bbox_raw = v.get("bbox")
+        bbox = list(bbox_raw[:4]) if isinstance(bbox_raw, list) and len(bbox_raw) >= 4 else None
+        page_raw = v.get("page")
+        page = (page_raw + 1) if isinstance(page_raw, int) else None
+        denom = max(1, v_role_totals[role])
+        out.append(BaselineExemplar(
+            role=role,
+            text=meta["description"] or meta["ocr"] or meta["uri"] or "",
+            n=n,
+            coverage=min(1.0, n / denom),
+            window_months=window_months,
+            first_seen="2024-01",
+            source_id=meta["asset_id"],
+            pattern_id=_stable_pattern_id(role, dedupe_text),
+            kind="visual",
+            visual_kind=v.get("kind"),
+            image_url=meta["uri"] or None,
+            ocr_text=meta["ocr"] or None,
+            classification=None,  # placeholder — wire when classifier ships
+            page=page,
+            bbox=bbox,
+        ))
+
     out.sort(key=lambda e: (e.role, -e.n, e.text))
     return out
 
@@ -178,8 +270,13 @@ def curated_path() -> Path:
 
 
 def exemplar_to_dict(ex: BaselineExemplar) -> dict:
-    """The canonical on-disk shape for one exemplar. Stable contract."""
-    return {
+    """
+    Canonical on-disk shape for one exemplar. Visual-specific fields
+    only emitted when kind != "text" or when populated, to keep
+    text-row JSON clean.
+    """
+    out: dict = {
+        "kind":          ex.kind,
         "role":          ex.role,
         "text":          ex.text,
         "n":             ex.n,
@@ -189,6 +286,19 @@ def exemplar_to_dict(ex: BaselineExemplar) -> dict:
         "source_id":     ex.source_id,
         "pattern_id":    ex.pattern_id,
     }
+    if ex.kind == "visual" or any([
+        ex.visual_kind, ex.image_url, ex.ocr_text, ex.classification,
+        ex.page is not None, ex.bbox,
+    ]):
+        out.update({
+            "visual_kind":    ex.visual_kind,
+            "image_url":      ex.image_url,
+            "ocr_text":       ex.ocr_text,
+            "classification": ex.classification,
+            "page":           ex.page,
+            "bbox":           list(ex.bbox) if ex.bbox else None,
+        })
+    return out
 
 
 def write_jsonl(path: Path, exemplars: list[BaselineExemplar]) -> int:
